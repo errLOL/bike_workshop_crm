@@ -1,0 +1,43 @@
+{% extends 'inventorymanager/layout.html' %}
+{% load crispy_forms_tags %}
+{% load static %}
+
+{% block title %}
+    {% if form.instance.pk %}Редактирование техники{% else %}Добавление техники{% endif %}
+{% endblock %}
+
+{% block body %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0">
+                        <i class="fas {% if form.instance.pk %}fa-edit{% else %}fa-plus-circle{% endif %} me-2 text-primary"></i>
+                        {% if form.instance.pk %}
+                            Редактирование техники: {{ form.instance.name }}
+                        {% else %}
+                            Добавление техники
+                        {% endif %}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        {{ form|crispy }}
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <a href="{% url 'transports' %}" class="btn btn-secondary">
+                                <i class="fas fa-times me-1"></i>Отмена
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i>
+                                {% if form.instance.pk %}Сохранить{% else %}Добавить{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

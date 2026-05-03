@@ -1,0 +1,223 @@
+{% extends 'inventorymanager/layout.html' %}
+{% load static %}
+
+{% block title %}Моя зарплата{% endblock %}
+
+{% block body %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <h2 class="mb-0">
+            <i class="fas fa-ruble-sign me-2 text-primary"></i>Моя зарплата
+        </h2>
+        <div class="d-flex gap-2">
+<!--            <button onclick="window.print();" class="btn btn-outline-secondary">-->
+<!--                <i class="fas fa-print me-1"></i>Печать-->
+<!--            </button>-->
+            <a href="{% url 'technician_dashboard' %}" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left me-1"></i>На дашборд
+            </a>
+        </div>
+    </div>
+
+    <!-- Инфо-блок -->
+    <div class="alert alert-info d-flex align-items-center mb-4">
+        <i class="fas fa-info-circle fa-2x me-3"></i>
+        <div>
+            <strong>Вы получаете {{ salary_percent }}% от стоимости работ.</strong>
+            Запчасти в расчёте зарплаты не участвуют.
+        </div>
+    </div>
+
+    <!-- Выбор периода -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label small text-muted">Период</label>
+                    <select name="period" class="form-select" id="periodSelect">
+                        <option value="week" {% if period_type == 'week' %}selected{% endif %}>Неделя</option>
+                        <option value="month" {% if period_type == 'month' %}selected{% endif %}>Месяц</option>
+                        <option value="quarter" {% if period_type == 'quarter' %}selected{% endif %}>Квартал</option>
+                        <option value="year" {% if period_type == 'year' %}selected{% endif %}>Год</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small text-muted">Дата</label>
+                    <select name="date" class="form-select" id="dateSelect">
+                        {% if period_type == 'week' %}
+                            {% for week in available_weeks %}
+                            <option value="{{ week.value }}" {% if start_date|date:"Y-m-d" == week.value %}selected{% endif %}>
+                                {{ week.label }}
+                            </option>
+                            {% endfor %}
+                        {% elif period_type == 'month' %}
+                            {% for month in available_months %}
+                            <option value="{{ month.value }}" {% if start_date|date:"Y-m" == month.value %}selected{% endif %}>
+                                {{ month.label }}
+                            </option>
+                            {% endfor %}
+                        {% elif period_type == 'quarter' %}
+                            {% for quarter in available_quarters %}
+                            <option value="{{ quarter.value }}" {% if quarter.label == period_label %}selected{% endif %}>
+                                {{ quarter.label }}
+                            </option>
+                            {% endfor %}
+                        {% elif period_type == 'year' %}
+                            {% for year in available_years %}
+                            <option value="{{ year.value }}" {% if start_date|date:"Y" == year.value %}selected{% endif %}>
+                                {{ year.label }}
+                            </option>
+                            {% endfor %}
+                        {% endif %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-chart-line me-1"></i>Показать
+                    </button>
+                </div>
+                <div class="col-md-2">
+                    <a href="{% url 'my_salary' %}" class="btn btn-outline-secondary w-100">
+                        <i class="fas fa-redo me-1"></i>Сброс
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Итоги за период -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-light border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="text-muted small text-uppercase">Период</div>
+                    <div class="h6 mt-2">{{ period_label }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-white border-0 shadow-sm" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                <div class="card-body text-center">
+                    <div class="small opacity-75">Выручка от услуг</div>
+                    <div class="h3 mb-0">{{ period_services_total|floatformat:2 }} ₽</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-white border-0 shadow-sm" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                <div class="card-body text-center">
+                    <div class="small opacity-75">Ваша зарплата ({{ salary_percent }}%)</div>
+                    <div class="h3 mb-0">{{ period_salary|floatformat:2 }} ₽</div>
+                    <div class="small mt-1">{{ period_orders_count }} заказов завершено</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- График -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-white py-3">
+            <h5 class="mb-0">
+                <i class="fas fa-chart-line me-2 text-primary"></i>Динамика за период
+            </h5>
+        </div>
+        <div class="card-body">
+            <canvas id="salaryChart" width="100%" height="80"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js v2 -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Получаем данные из контекста Django
+    const labels = {{ chart_labels|safe }};
+    const servicesData = {{ chart_services_data|safe }};
+    const salaryData = {{ chart_salary_data|safe }};
+
+    const ctx = document.getElementById('salaryChart').getContext('2d');
+
+    // Chart.js v2 API
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Выручка от услуг (₽)',
+                    data: servicesData,
+                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                    borderColor: '#667eea',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#667eea',
+                    pointBorderColor: '#fff',
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    fill: true,
+                    tension: 0.3
+                },
+                {
+                    label: 'Ваша зарплата (₽)',
+                    data: salaryData,
+                    backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                    borderColor: '#28a745',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#28a745',
+                    pointBorderColor: '#fff',
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    fill: true,
+                    tension: 0.3
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                yAxes: [{
+                    ticks: {
+                        beginAtZero: true,
+                        callback: function(value) {
+                            return value.toLocaleString() + ' ₽';
+                        }
+                    },
+                    gridLines: {
+                        color: '#e9ecef'
+                    }
+                }],
+                xAxes: [{
+                    gridLines: {
+                        display: false
+                    }
+                }]
+            },
+            tooltips: {
+                callbacks: {
+                    label: function(tooltipItem, data) {
+                        const datasetLabel = data.datasets[tooltipItem.datasetIndex].label || '';
+                        const value = tooltipItem.yLabel;
+                        return datasetLabel + ': ' + value.toLocaleString() + ' ₽';
+                    }
+                }
+            },
+            legend: {
+                position: 'top',
+                labels: {
+                    boxWidth: 12,
+                    usePointStyle: true
+                }
+            }
+        }
+    });
+
+    // Автоматическое обновление селекта даты при смене периода
+    const periodSelect = document.getElementById('periodSelect');
+    if (periodSelect) {
+        periodSelect.addEventListener('change', function() {
+            window.location.href = '?period=' + this.value;
+        });
+    }
+});
+</script>
+{% endblock %}

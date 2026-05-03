@@ -1,0 +1,321 @@
+{% extends "inventorymanager/layout.html" %}
+
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}Заказы - Мастерская{% endblock %}
+{% block body %}
+{% if messages %}
+    <div class="alert alert-success alert-dismissible fade show mt-2" role="alert">
+        {% for message in messages %}
+            {{ message }}
+        {% endfor %}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+{% endif %}
+
+{% block extra_css %}
+<style>
+    .order-card {
+        transition: all 0.2s ease;
+        border-left: 4px solid;
+        margin-bottom: 1rem;
+    }
+    .order-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    }
+    .order-card.accepted { border-left-color: rgb(13, 110, 253); }
+    .order-card.in_work { border-left-color: #17a2b8; }
+    .order-card.waiting_spareparts { border-left-color: #fd7e14; }
+    .order-card.ready { border-left-color: #28a745; }
+    .order-card.issued { border-left-color: ##ffc107; }
+
+    .order-number {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #2c3e50;
+    }
+    .order-meta {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+    .order-total {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #2c3e50;
+    }
+    .status-badge {
+        padding: 0.35rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    .filter-bar {
+        background: white;
+        border-radius: 12px;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .stats-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 16px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+    .stats-number {
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+    .stats-label {
+        font-size: 0.85rem;
+        opacity: 0.9;
+    }
+    .search-input {
+        border-radius: 20px;
+        padding-left: 2.5rem;
+    }
+    .search-icon {
+        position: absolute;
+        left: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #adb5bd;
+    }
+    @media (max-width: 768px) {
+        .stats-card {
+            margin-bottom: 1rem;
+        }
+        .order-card .row > div {
+            margin-bottom: 0.5rem;
+        }
+    }
+</style>
+{% endblock %}
+
+<div class="container-fluid py-4">
+    <!-- Заголовок -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <h2 class="mb-0">
+            <i class="fas fa-clipboard-list me-2 text-primary"></i>Заказы
+        </h2>
+        <a href="{% url 'create_order' %}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i>Новый заказ
+        </a>
+    </div>
+
+    <!-- Статистика -->
+    {% if admin %}
+    <div class="row mb-4">
+        <div class="col-md-3 col-sm-6">
+            <div class="stats-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                <div class="stats-number">{{ total_orders }}</div>
+                <div class="stats-label">Всего заказов</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="stats-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                <div class="stats-number">{{ in_work_count }}</div>
+                <div class="stats-label">В работе</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="stats-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                <div class="stats-number">{{ ready_count }}</div>
+                <div class="stats-label">Готовых</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="stats-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                <div class="stats-number">{{ total_revenue|floatformat:0 }} ₽</div>
+                <div class="stats-label">Выручка</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    <!-- Панель фильтров -->
+    <div class="filter-bar">
+        <form method="get" class="row g-3">
+            <div class="col-md-4">
+                <div class="position-relative">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" name="search" class="form-control search-input"
+                           placeholder="Поиск по номеру, клиенту или технике..."
+                           value="{{ request.GET.search|default:'' }}">
+                </div>
+            </div>
+            <div class="col-md-3">
+                <select name="status" class="form-select">
+                    <option value="">Все статусы</option>
+                    <option value="accepted" {% if request.GET.status == 'accepted' %}selected{% endif %}>Новый</option>
+                    <option value="in_work" {% if request.GET.status == 'in_work' %}selected{% endif %}>В работе</option>
+                    <option value="waiting_spareparts" {% if request.GET.status == 'waiting_spareparts' %}selected{% endif %}>Ждет запчастей</option>
+                    <option value="ready" {% if request.GET.status == 'ready' %}selected{% endif %}>Готов</option>
+                    <option value="issued" {% if request.GET.status == 'issued' %}selected{% endif %}>Выдан</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <input type="date" name="date_from" class="form-control" placeholder="С даты"
+                       value="{{ request.GET.date_from|default:'' }}">
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="fas fa-filter me-1"></i>Применить
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Список заказов (карточки) -->
+    {% if orders %}
+        {% for order in orders %}
+        <div class="card order-card {{ order.status }} mb-3">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <!-- Основная информация -->
+                    <div class="col-md-4">
+                        <div class="order-number">
+                            <a href="{% url 'order_detail' order.id %}" class="text-decoration-none">
+                                Заказ №{{ order.id }}
+                            </a>
+                        </div>
+                        <div class="order-meta mt-1">
+                            <i class="far fa-calendar-alt me-1"></i>{{ order.created_at|date:"d.m.Y H:i" }}
+                        </div>
+                        <div class="order-meta">
+                            <i class="fas fa-user me-1"></i>{{ order.customer.name|default:"—" }}
+                        </div>
+                        <div class="order-meta">
+                            <i class="fas fa-bicycle me-1"></i>{{ order.transport.name|default:"—" }}
+                            {% if order.transport.serial_number %}
+                                <span class="text-muted">(SN: {{ order.transport.serial_number }})</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Сотрудник и статус -->
+                    <div class="col-md-3">
+                        <div class="order-meta">
+                            <i class="fas fa-user-cog me-1"></i>
+                            {{ order.employee.first_name }}
+                        </div>
+                        <div class="mt-2">
+                            {% if order.status == 'in_work' %}
+                                <span class="status-badge bg-info ">🔄 В работе</span>
+                            {% elif order.status == 'waiting_spareparts' %}
+                                <span class="status-badge bg-warning">⏳ Ожидает запчасти</span>
+                            {% elif order.status == 'ready' %}
+                                <span class="status-badge bg-success text-white">✅ Готов</span>
+                            {% elif order.status == 'accepted' %}
+                                <span class="status-badge bg-primary text-white">🆕 Новый</span>
+                            {% else %}
+                                <span class="status-badge bg-secondary">📁 Выдан</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Сумма и позиции -->
+                    <div class="col-md-3">
+                        <div class="order-total">
+                            {{ order.total_value|floatformat:2 }} ₽
+                        </div>
+                        <div class="order-meta">
+                            <i class="fas fa-boxes me-1"></i>{{ order.order_items.count }} позиций
+                        </div>
+                    </div>
+
+                    <!-- Действия -->
+                    <div class="col-md-2 text-md-end">
+                        <div class="btn-group" role="group">
+                            <a href="{% url 'order_detail' order.id %}" class="btn btn-sm btn-outline-primary" title="Просмотр">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            <a href="{% url 'edit_order' order.id %}" class="btn btn-sm btn-outline-secondary" title="Редактировать">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                    onclick="if(confirm('Отменить заказ №{{ order.id }}?')) window.location.href='{% url 'cancel_order_update' order.id %}'"
+                                    title="Отменить">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="mt-2">
+                            {% if order.status == 'accepted' %}
+                            <button type="button" class="btn btn-sm btn-warning text_white"
+                                    onclick="window.location.href='{% url 'change_order_status' order.id %}?status=in_work'"
+                                    title="В работу">
+                                <i class="fa-solid fa-screwdriver-wrench"></i> В работу
+                            </button>
+                            {% elif order.status == 'in_work' or order.status == 'waiting_spareparts' %}
+                            <button type="button" class="btn btn-sm btn-success"
+                                    onclick="window.location.href='{% url 'change_order_status' order.id %}?status=ready'"
+                                    title="Готов">
+                                <i class="fas fa-check me-1"></i> Готов
+                            </button>
+                            {% elif order.status == 'ready' %}
+                            <button type="button" class="btn btn-sm btn-primary"
+                                    onclick="window.location.href='{% url 'change_order_status' order.id %}?status=issued'"
+                                    title="Завершить">
+                                <i class="fa-solid fa-box"></i> Завершить
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        <!-- Пагинация -->
+        {% if is_paginated %}
+        <nav aria-label="Page navigation" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                            <i class="fas fa-angle-double-left"></i>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                            <i class="fas fa-angle-left"></i>
+                        </a>
+                    </li>
+                {% endif %}
+
+                <li class="page-item active">
+                    <span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+                </li>
+
+                {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                            <i class="fas fa-angle-right"></i>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                            <i class="fas fa-angle-double-right"></i>
+                        </a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+
+    {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-inbox fa-4x text-muted mb-3"></i>
+            <h5 class="text-muted">Нет заказов</h5>
+            <p class="text-muted">Создайте первый заказ, нажав кнопку "Новый заказ"</p>
+            <a href="{% url 'create_order' %}" class="btn btn-primary mt-2">
+                <i class="fas fa-plus me-1"></i>Создать заказ
+            </a>
+        </div>
+    {% endif %}
+</div>
+{% endblock body %}
+

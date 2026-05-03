@@ -1,0 +1,342 @@
+{% extends 'inventorymanager/layout.html' %}
+{% load static %}
+
+{% block title %}Мой дашборд{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        background: white;
+        border-radius: 16px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        border-left: 4px solid #667eea;
+        transition: all 0.2s ease;
+    }
+    .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    }
+    .stat-number {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #2c3e50;
+    }
+    .stat-label {
+        color: #6c757d;
+        font-size: 0.85rem;
+    }
+    .salary-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 16px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+    .salary-number {
+        font-size: 1.75rem;
+        font-weight: 700;
+    }
+    .salary-label {
+        font-size: 0.8rem;
+        opacity: 0.9;
+    }
+    .order-card {
+        transition: all 0.2s ease;
+        border-left: 3px solid;
+        margin-bottom: 0.75rem;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .order-card:hover {
+        background-color: #f8f9fa;
+        transform: translateX(2px);
+    }
+    .order-card.accepted { border-left-color: rgb(13, 110, 253); }
+    .order-card.in_work { border-left-color: #17a2b8; }
+    .order-card.waiting_spareparts { border-left-color: #fd7e14; }
+    .order-card.ready { border-left-color: #28a745; }
+    .order-card.issued { border-left-color: ##ffc107; }
+    .progress-circle {
+        width: 80px;
+        height: 80px;
+    }
+    .welcome-avatar {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.5rem;
+        font-weight: 600;
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container-fluid py-4">
+    <!-- Приветствие -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <div class="welcome-avatar">
+                {{ request.user.get_full_name|first|default:request.user.username|first|upper }}
+            </div>
+            <div>
+                <h1 class="mb-0">Привет, {{ request.user.get_full_name|default:request.user.username }}!</h1>
+                <p class="text-muted mt-1 mb-0">
+                    <i class="fas fa-calendar-alt me-1"></i>
+                    {{ current_date|date:"l, d.m.Y" }}
+                </p>
+            </div>
+        </div>
+        <a href="{% url 'create_order' %}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i>Новый заказ
+        </a>
+    </div>
+
+    <!-- Статистика техника -->
+    <div class="row mb-4 g-3">
+        <div class="col-md-3 col-sm-6">
+            <div class="stat-card">
+                <div class="stat-number">{{ total_my_orders }}</div>
+                <div class="stat-label">
+                    <i class="fas fa-clipboard-list me-1"></i>Всего заказов
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="stat-card" style="border-left-color: #17a2b8;">
+                <div class="stat-number">{{ my_in_progress_count }}</div>
+                <div class="stat-label">
+                    <i class="fas fa-tools me-1"></i>В работе
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="stat-card" style="border-left-color: #fd7e14;">
+                <div class="stat-number">{{ my_awaiting_parts_count }}</div>
+                <div class="stat-label">
+                    <i class="fas fa-clock me-1"></i>Ожидают запчасти
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="stat-card" style="border-left-color: #28a745;">
+                <div class="stat-number">{{ my_completed_count }}</div>
+                <div class="stat-label">
+                    <i class="fas fa-check-circle me-1"></i>Завершено
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Зарплатный виджет -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="salary-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="salary-label">
+                            <i class="fas fa-percent me-1"></i>Ваш процент от работ
+                        </div>
+                        <div class="salary-number">{{ salary_percent }}%</div>
+                    </div>
+                    <div class="text-end">
+                        <div class="salary-label">
+                            <i class="fas fa-ruble-sign me-1"></i>Выручка за сегодня
+                        </div>
+                        <div class="salary-number">{{ today_services|floatformat:0 }} ₽</div>
+                        <div class="small mt-2 opacity-75">
+                            <i class="fas fa-calculator me-1"></i>Ваша зарплата:
+                            <strong>{{ today_salary|floatformat:0 }} ₽</strong>
+                        </div>
+                    </div>
+                </div>
+                <div class="progress mt-3" style="height: 8px;">
+                    <div class="progress-bar progress-bar-striped" role="progressbar"
+                         style="width: {{ completion_rate }}%;"
+                         aria-valuenow="{{ completion_rate }}" aria-valuemin="0" aria-valuemax="100">
+                    </div>
+                </div>
+                <div class="d-flex justify-content-between mt-2 small">
+                    <span><i class="fas fa-chart-line me-1"></i>Выполнено {{ completion_rate }}% заказов</span>
+                    <a href="{% url 'my_salary' %}" class="text-white text-decoration-none">
+                        Подробнее <i class="fas fa-arrow-right ms-1"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="row g-3 h-100">
+                <div class="col-6">
+                    <div class="stat-card text-center" style="border-left-color: #20c997;">
+                        <div class="stat-number">{{ avg_order_value|floatformat:0 }} ₽</div>
+                        <div class="stat-label">Средний чек</div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="stat-card text-center" style="border-left-color: #6f42c1;">
+                        <div class="stat-number">{{ unique_customers_count }}</div>
+                        <div class="stat-label">Уникальных клиентов</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Мои активные заказы -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-tasks me-2 text-primary"></i>Мои активные заказы
+                    </h5>
+                    <a href="{% url 'orders' %}?status=accepted&amp;status=in_work" class="btn btn-sm btn-link">
+                        Все активные <i class="fas fa-arrow-right ms-1"></i>
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    {% if my_active_orders %}
+                        {% for order in my_active_orders %}
+                        <div class="order-card p-3 {{order.status}}">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <a href="{% url 'order_detail' order.id %}" class="fw-bold text-decoration-none">
+                                        Заказ #{{ order.id }}
+                                    </a>
+                                    <div class="small text-muted">
+                                        {{ order.customer.name|default:"—" }} • {{ order.transport.name|default:"—" }}
+                                    </div>
+                                    <div class="small mt-1">
+                                        <span class="badge {% if order.status == 'in_work' %}bg-info text-dark{% else %}bg-primary text-white{% endif %}">
+                                            {{ order.get_status_display }}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="fw-bold">{{ order.total_amount|floatformat:2 }} ₽</div>
+                                    <div class="small text-muted">{{ order.created_at|date:"d.m.Y" }}</div>
+                                    <div class="small text-muted">{{ order.created_at|date:"H:i" }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-4 text-muted">
+                            <i class="fas fa-check-circle fa-2x mb-2 d-block text-success"></i>
+                            Нет активных заказов. Отдыхайте!
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Заказы, ожидающие запчасти -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-clock me-2 text-warning"></i>Ожидают запчасти
+                    </h5>
+                    <a href="{% url 'orders' %}?status=waiting_spareparts" class="btn btn-sm btn-link">
+                        Все ожидающие <i class="fas fa-arrow-right ms-1"></i>
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    {% if awaiting_parts %}
+                        {% for order in awaiting_parts %}
+                        <div class="order-card waiting_spareparts p-3">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <a href="{% url 'order_detail' order.id %}" class="fw-bold text-decoration-none">
+                                        Заказ #{{ order.id }}
+                                    </a>
+                                    <div class="small text-muted">
+                                        {{ order.customer.name|default:"—" }} • {{ order.transport.name|default:"—" }}
+                                    </div>
+                                    <div class="small mt-1">
+                                        <span class="badge bg-warning text-dark">
+                                            {{ order.get_status_display }}
+                                        </span>
+                                        {% if order.employee != request.user %}
+                                        <span class="badge bg-secondary">Техник: {{ order.employee.get_full_name|default:order.employee.username }}</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="small text-muted">{{ order.created_at|date:"d.m.Y" }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-4 text-muted">
+                            <i class="fas fa-check-circle fa-2x mb-2 d-block text-success"></i>
+                            Нет заказов, ожидающих запчасти
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Недавние завершённые заказы -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-check-circle me-2 text-success"></i>Недавние завершённые заказы
+            </h5>
+            <a href="{% url 'orders' %}?status=completed" class="btn btn-sm btn-link">
+                Все завершённые <i class="fas fa-arrow-right ms-1"></i>
+            </a>
+        </div>
+        <div class="card-body p-0">
+            {% if my_completed_orders %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>№</th>
+                            <th>Клиент</th>
+                            <th>Техника</th>
+                            <th>Дата</th>
+                            <th>Сумма</th>
+                            <th>Ваш доход</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in my_completed_orders %}
+                        <tr>
+                            <td class="fw-bold">#{{ order.id }}</td>
+                            <td>{{ order.customer.name|default:"—" }}</td>
+                            <td>{{ order.transport.name|default:"—" }}</td>
+                            <td>{{ order.created_at|date:"d.m.Y" }}</td>
+                            <td class="fw-bold">{{ order.total_amount|floatformat:2 }} ₽</td>
+                            <td class="text-success">{{ order.technician_earnings|floatformat:2 }} ₽</td>
+                            <td>
+                                <a href="{% url 'order_detail' order.id %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                         </tr>
+                        {% endfor %}
+                    </tbody>
+                 </table>
+            </div>
+            {% else %}
+            <div class="text-center py-4 text-muted">
+                <i class="fas fa-clipboard-list fa-2x mb-2 d-block"></i>
+                Нет завершённых заказов
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

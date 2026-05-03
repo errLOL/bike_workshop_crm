@@ -1,0 +1,233 @@
+{% extends 'inventorymanager/layout.html' %}
+{% load static %}
+
+{% block title %}{{ customer.name }} - Клиент{% endblock %}
+
+{% block extra_css %}
+<style>
+    .info-card {
+        border-radius: 16px;
+        border: none;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        margin-bottom: 1.5rem;
+        overflow: hidden;
+    }
+    .info-card .card-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 1rem 1.5rem;
+        font-weight: 600;
+    }
+    .info-row {
+        display: flex;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    .info-label {
+        width: 100px;
+        font-weight: 600;
+        color: #6c757d;
+    }
+    .info-value {
+        flex: 1;
+        color: #2c3e50;
+    }
+    .transport-card {
+        transition: all 0.2s ease;
+        border-left: 4px solid #667eea;
+    }
+    .transport-card:hover {
+        background-color: #f8f9fa;
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container-fluid py-4">
+    <!-- Хлебные крошки -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'customers' %}">Клиенты</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ customer.name }}</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <!-- Левая колонка - информация о клиенте -->
+        <div class="col-lg-4">
+            <div class="info-card">
+                <div class="card-header">
+                    <i class="fas fa-user me-2"></i>Информация о клиенте
+                </div>
+                <div class="card-body">
+                    <div class="info-row">
+                        <div class="info-label">Имя:</div>
+                        <div class="info-value"><strong>{{ customer.name }}</strong></div>
+                    </div>
+                    {% if customer.phone %}
+                    <div class="info-row">
+                        <div class="info-label">Телефон:</div>
+                        <div class="info-value">
+                            <a href="tel:{{ customer.phone }}">{{ customer.formatted_phone }}</a>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if customer.telegram %}
+                    <div class="info-row">
+                        <div class="info-label">Telegram:</div>
+                        <div class="info-value">
+                            <a href="https://t.me/{{ customer.telegram }}" target="_blank">
+                                @{{ customer.telegram }}
+                            </a>
+                        </div>
+                    </div>
+                    {% endif %}
+                    <div class="info-row">
+                        <div class="info-label">Дата добавления:</div>
+                        <div class="info-value">{{ customer.created_at|date:"d.m.Y" }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Статистика -->
+            <div class="info-card">
+                <div class="card-header">
+                    <i class="fas fa-chart-line me-2"></i>Статистика
+                </div>
+                <div class="card-body">
+                    <div class="info-row">
+                        <div class="info-label">Всего заказов:</div>
+                        <div class="info-value">{{ orders.count }}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Техники:</div>
+                        <div class="info-value">{{ transports.count }}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Общая сумма:</div>
+                        <div class="info-value fw-bold text-primary">{{ total_spent|floatformat:2 }} ₽</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Кнопки действий -->
+            <div class="d-flex gap-2">
+                <a href="{% url 'edit_customer' customer.id %}" class="btn btn-outline-primary flex-grow-1">
+                    <i class="fas fa-edit me-1"></i>Редактировать
+                </a>
+                <a href="{% url 'create_order' %}?customer={{ customer.id }}" class="btn btn-primary flex-grow-1">
+                    <i class="fas fa-plus me-1"></i>Новый заказ
+                </a>
+            </div>
+        </div>
+
+        <!-- Правая колонка - техника и заказы -->
+        <div class="col-lg-8">
+            <!-- Техника клиента -->
+            <div class="info-card">
+                <div class="card-header">
+                    <i class="fas fa-bicycle me-2"></i>Техника клиента
+                </div>
+                <div class="card-body">
+                    {% if transports %}
+                        {% for transport in transports %}
+                        <div class="transport-card card mb-2">
+                            <div class="card-body py-3">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <h6 class="mb-1">{{ transport.name }}</h6>
+                                        <div class="small text-muted">
+                                            <span class="badge bg-secondary me-2">{{ transport.get_transport_type_display }}</span>
+                                            {% if transport.serial_number %}
+                                                SN: {{ transport.serial_number }}
+                                            {% endif %}
+                                            {% if transport.color %}
+                                                • Цвет: {{ transport.color }}
+                                            {% endif %}
+                                        </div>
+                                        {% if transport.comment %}
+                                        <div class="small text-muted mt-1">
+                                            <i class="fas fa-comment me-1"></i>{{ transport.comment }}
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="btn-group">
+                                        <a href="{% url 'edit_transport' transport.id %}" class="btn btn-sm btn-outline-secondary">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-4 text-muted">
+                            <i class="fas fa-bicycle fa-2x mb-2 d-block"></i>
+                            У клиента пока нет техники
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Заказы клиента -->
+            <div class="info-card">
+                <div class="card-header">
+                    <i class="fas fa-clipboard-list me-2"></i>История заказов
+                </div>
+                <div class="card-body p-0">
+                    {% if orders %}
+                    <div class="table-responsive">
+                        <table class="table mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>№</th>
+                                    <th>Дата</th>
+                                    <th>Техника</th>
+                                    <th>Сумма</th>
+                                    <th>Статус</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in orders %}
+                                <tr>
+                                    <td>#{{ order.id }}</td>
+                                    <td>{{ order.created_at|date:"d.m.Y" }}</td>
+                                    <td>{{ order.transport.name|default:"—" }}</td>
+                                    <td class="fw-bold">{{ order.total_amount|floatformat:2 }} ₽</td>
+                                    <td>
+                                        {% if order.status == 'in_work' %}
+                                            <span class="badge bg-info ">🔄 В работе</span>
+                                        {% elif order.status == 'waiting_spareparts' %}
+                                            <span class="badge bg-warning">⏳ Ожидает запчасти</span>
+                                        {% elif order.status == 'ready' %}
+                                            <span class="badge bg-success text-white">✅ Готов</span>
+                                        {% elif order.status == 'accepted' %}
+                                            <span class="badge bg-primary text-white">🆕 Новый</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">📁 Выдан</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'order_detail' order.id %}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-clipboard-list fa-2x mb-2 d-block"></i>
+                        У клиента пока нет заказов
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

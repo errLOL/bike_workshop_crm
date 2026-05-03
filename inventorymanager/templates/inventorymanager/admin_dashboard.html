@@ -1,0 +1,482 @@
+{% extends "inventorymanager/layout.html" %}
+{% load static %}
+
+{% block title %}Панель управления{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        border-radius: 16px;
+        border: none;
+        transition: all 0.2s ease;
+        overflow: hidden;
+    }
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    }
+    .stat-card .card-body {
+        padding: 1.25rem;
+    }
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+    }
+    .stat-value {
+        font-size: 1.75rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+    .stat-label {
+        font-size: 0.8rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .chart-card {
+        border-radius: 16px;
+        border: none;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        margin-bottom: 1.5rem;
+        overflow: hidden;
+    }
+    .chart-card .card-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 0.75rem 1.25rem;
+        font-weight: 500;
+    }
+    .chart-card .card-header i {
+        margin-right: 8px;
+    }
+    .low-stock-warning {
+        background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
+        color: #2c3e50;
+    }
+    .revenue-card {
+        background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        color: #2c3e50;
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container-fluid py-4">
+    <!-- Заголовок -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="mb-0">
+                <i class="fas fa-chart-line me-2 text-primary"></i>Панель управления
+            </h1>
+            <p class="text-muted mt-1">Общая статистика мастерской</p>
+        </div>
+        <div class="text-muted">
+            <i class="fas fa-calendar-alt me-1"></i>{% now "d.m.Y" %}
+        </div>
+    </div>
+
+    <!-- Карточки статистики -->
+    <div class="row g-4 mb-4">
+        <!-- Выручка -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card stat-card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="stat-value text-success">{{ revenue|floatformat:0 }} ₽</div>
+                            <div class="stat-label mt-1">Чистая прибыль</div>
+                        </div>
+                        <div class="stat-icon bg-success bg-opacity-10 text-success">
+                            <i class="fas fa-ruble-sign"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3 small text-muted">
+                        <i class="fas fa-chart-line me-1"></i>Выручка от услуг — расходы
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Сумма всех заказов -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card stat-card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="stat-value text-primary">{{ orders_total|floatformat:0 }} ₽</div>
+                            <div class="stat-label mt-1">Оборот заказов</div>
+                        </div>
+                        <div class="stat-icon bg-primary bg-opacity-10 text-primary">
+                            <i class="fas fa-shopping-cart"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3 small text-muted">
+                        <i class="fas fa-cube me-1"></i>Общая сумма всех заказов
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Товаров на сумму -->
+        <div class="col-xl-3 col-md-6">
+            <a href="{% url 'products' %}" class="text-decoration-none">
+                <div class="card stat-card shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="stat-value text-info">{{ products_total|floatformat:0 }} ₽</div>
+                                <div class="stat-label mt-1">Себестоимость товаров</div>
+                            </div>
+                            <div class="stat-icon bg-info bg-opacity-10 text-info">
+                                <i class="fas fa-boxes"></i>
+                            </div>
+                        </div>
+                        <div class="mt-3 small text-muted">
+                            <i class="fas fa-dolly me-1"></i>Товаров на складе
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Низкий остаток -->
+        <div class="col-xl-3 col-md-6">
+            <a href="{% url 'products' %}" class="text-decoration-none">
+                <div class="card stat-card shadow-sm h-100 {% if low_stock > 0 %}low-stock-warning{% endif %}">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="stat-value {% if low_stock > 0 %}text-dark{% else %}text-muted{% endif %}">
+                                    {{ low_stock }}
+                                </div>
+                                <div class="stat-label mt-1">Товары с низким остатком</div>
+                            </div>
+                            <div class="stat-icon bg-warning bg-opacity-25 text-warning">
+                                <i class="fas fa-triangle-exclamation"></i>
+                            </div>
+                        </div>
+                        <div class="mt-3 small">
+                            {% if low_stock > 0 %}
+                                <i class="fas fa-clock me-1"></i>Требуется пополнение
+                            {% else %}
+                                <i class="fas fa-check-circle me-1 text-success"></i>Всё в порядке
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <!-- Графики: первая строка -->
+    <div class="row">
+        <!-- Динамика выручки по месяцам -->
+        <div class="col-xl-7">
+            <div class="chart-card">
+                <div class="card-header">
+                    <i class="fas fa-chart-line"></i>Динамика выручки по месяцам
+                </div>
+                <div class="card-body">
+                    <canvas id="revenueChart" width="100%" height="60"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Топ-3 товаров -->
+        <div class="col-xl-5">
+            <div class="chart-card">
+                <div class="card-header">
+                    <i class="fas fa-chart-bar"></i>Самые продаваемые товары
+                </div>
+                <div class="card-body">
+                    <canvas id="topProductsChart" width="100%" height="60"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Графики: вторая строка -->
+    <div class="row">
+        <!-- Остатки на складе (топ-8) -->
+        <div class="col-xl-5">
+            <div class="chart-card">
+                <div class="card-header">
+                    <i class="fas fa-chart-bar"></i>Остатки на складе
+                </div>
+                <div class="card-body">
+                    <canvas id="inventoryChart" width="100%" height="60"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Доля поставщиков -->
+        <div class="col-xl-4">
+            <div class="chart-card">
+                <div class="card-header">
+                    <i class="fas fa-chart-pie"></i>Доля товаров по поставщикам
+                </div>
+                <div class="card-body">
+                    <canvas id="supplierChart" width="100%" height="60"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Топ-3 клиентов -->
+        <div class="col-xl-3">
+            <div class="chart-card">
+                <div class="card-header">
+                    <i class="fas fa-users"></i>Топ клиентов по выручке
+                </div>
+                <div class="card-body">
+                    <canvas id="customersChart" width="100%" height="60"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Быстрый доступ -->
+    <div class="row g-3 mt-2">
+        <div class="col-md-3 col-sm-6">
+            <a href="{% url 'orders' %}" class="text-decoration-none">
+                <div class="card shadow-sm text-center py-3">
+                    <i class="fas fa-clipboard-list fa-2x text-primary mb-2"></i>
+                    <div class="fw-bold">Заказы</div>
+                    <small class="text-muted">Управление заказами</small>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <a href="{% url 'products' %}" class="text-decoration-none">
+                <div class="card shadow-sm text-center py-3">
+                    <i class="fas fa-boxes fa-2x text-success mb-2"></i>
+                    <div class="fw-bold">Товары</div>
+                    <small class="text-muted">Управление складом</small>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <a href="{% url 'customers' %}" class="text-decoration-none">
+                <div class="card shadow-sm text-center py-3">
+                    <i class="fas fa-users fa-2x text-info mb-2"></i>
+                    <div class="fw-bold">Клиенты</div>
+                    <small class="text-muted">База клиентов</small>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <a href="{% url 'salary_report' %}" class="text-decoration-none">
+                <div class="card shadow-sm text-center py-3">
+                    <i class="fas fa-ruble-sign fa-2x text-warning mb-2"></i>
+                    <div class="fw-bold">Зарплаты</div>
+                    <small class="text-muted">Отчёт по зарплатам</small>
+                </div>
+            </a>
+        </div>
+    </div>
+</div>
+
+<!--<script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.js"></script>-->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // График выручки по месяцам
+    const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+    const revenueLabels = {{ sales_rev_labels|safe }};
+    const revenueData = {{ sales_rev_data|safe }};
+
+    new Chart(revenueCtx, {
+        type: 'line',
+        data: {
+            labels: revenueLabels,
+            datasets: [{
+                label: 'Выручка (₽)',
+                data: revenueData,
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                borderColor: '#667eea',
+                borderWidth: 2,
+                pointBackgroundColor: '#667eea',
+                pointBorderColor: '#fff',
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                yAxes: [{
+                    ticks: {
+                        beginAtZero: true,
+                        callback: function(value) {
+                            return value.toLocaleString() + ' ₽';
+                        }
+                    }
+                }],
+                xAxes: [{
+                    gridLines: { display: false }
+                }]
+            },
+            tooltips: {
+                callbacks: {
+                    label: function(tooltipItem, data) {
+                        return 'Выручка: ' + tooltipItem.yLabel.toLocaleString() + ' ₽';
+                    }
+                }
+            }
+        }
+    });
+
+    // График топ-3 товаров
+    const topCtx = document.getElementById('topProductsChart').getContext('2d');
+    const topLabels = {{ tps_chart_labes|safe }};
+    const topData = {{ tps_chart_data|safe }};
+
+    new Chart(topCtx, {
+        type: 'bar',
+        data: {
+            labels: topLabels,
+            datasets: [{
+                label: 'Продано (шт)',
+                data: topData,
+                backgroundColor: 'rgba(40, 167, 69, 0.7)',
+                borderColor: '#28a745',
+                borderWidth: 1,
+                borderRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                yAxes: [{
+                    ticks: { beginAtZero: true }
+                }],
+                xAxes: [{
+                    gridLines: { display: false }
+                }]
+            },
+            legend: { display: false }
+        }
+    });
+
+    // График остатков на складе
+    const inventoryCtx = document.getElementById('inventoryChart').getContext('2d');
+    const inventoryLabels = {{ il_chart_labels|safe }};
+    const inventoryData = {{ il_chart_data|safe }};
+
+    new Chart(inventoryCtx, {
+        type: 'bar',
+        data: {
+            labels: inventoryLabels.slice(0, 8),
+            datasets: [{
+                label: 'Остаток (шт)',
+                data: inventoryData.slice(0, 8),
+                backgroundColor: 'rgba(102, 126, 234, 0.7)',
+                borderColor: '#667eea',
+                borderWidth: 1,
+                borderRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                yAxes: [{
+                    ticks: { beginAtZero: true }
+                }],
+                xAxes: [{
+                    ticks: { autoSkip: true, maxRotation: 45, minRotation: 45 },
+                    gridLines: { display: false }
+                }]
+            },
+            legend: { display: false }
+        }
+    });
+
+    // График доли поставщиков
+    const supplierCtx = document.getElementById('supplierChart').getContext('2d');
+    const supplierLabels = {{ sc_chart_labels|safe }};
+    const supplierData = {{ sc_chart_data|safe }};
+
+    new Chart(supplierCtx, {
+        type: 'pie',
+        data: {
+            labels: supplierLabels,
+            datasets: [{
+                data: supplierData,
+                backgroundColor: ['#667eea', '#28a745', '#fd7e14', '#e83e8c', '#20c997', '#ffc107'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            legend: {
+                position: 'bottom',
+                labels: { boxWidth: 12, fontSize: 11 }
+            },
+            tooltips: {
+                callbacks: {
+                    label: function(tooltipItem, data) {
+                        const label = data.labels[tooltipItem.index] || '';
+                        const value = data.datasets[0].data[tooltipItem.index];
+                        return `${label}: ${value}%`;
+                    }
+                }
+            }
+        }
+    });
+
+    // График топ-3 клиентов
+    const customersCtx = document.getElementById('customersChart').getContext('2d');
+    const customersLabels = {{ customer_orders_labels|safe }};
+    const customersData = {{ customer_orders_data|safe }};
+
+    new Chart(customersCtx, {
+        type: 'horizontalBar',
+        data: {
+            labels: customersLabels,
+            datasets: [{
+                label: 'Выручка (₽)',
+                data: customersData,
+                backgroundColor: 'rgba(255, 193, 7, 0.7)',
+                borderColor: '#ffc107',
+                borderWidth: 1,
+                borderRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                xAxes: [{
+                    ticks: {
+                        callback: function(value) {
+                            return value.toLocaleString() + ' ₽';
+                        }
+                    }
+                }],
+                yAxes: [{
+                    gridLines: { display: false }
+                }]
+            },
+            legend: { display: false },
+            tooltips: {
+                callbacks: {
+                    label: function(tooltipItem, data) {
+                        return 'Выручка: ' + tooltipItem.xLabel.toLocaleString() + ' ₽';
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

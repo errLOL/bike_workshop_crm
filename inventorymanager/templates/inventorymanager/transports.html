@@ -1,0 +1,233 @@
+{% extends 'inventorymanager/layout.html' %}
+{% load static %}
+
+{% block title %}Техника - Мастерская{% endblock %}
+
+{% block extra_css %}
+<style>
+    .transport-card {
+        transition: all 0.2s ease;
+        border: none;
+        border-radius: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .transport-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    }
+    .transport-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.4rem;
+    }
+    .stat-card {
+        background: white;
+        border-radius: 16px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        border-left: 4px solid #667eea;
+    }
+    .stat-number {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #2c3e50;
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container-fluid py-4">
+    <!-- Заголовок -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <h2 class="mb-0">
+            <i class="fas fa-bicycle me-2 text-primary"></i>Техника клиентов
+        </h2>
+        <a href="{% url 'create_transport' %}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i>Добавить технику
+        </a>
+    </div>
+
+    <!-- Статистика -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="stat-card">
+                <div class="stat-number">{{ total_transports }}</div>
+                <div class="stat-label">Всего единиц техники</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card">
+                <div class="stat-number">{{ total_customers }}</div>
+                <div class="stat-label">Клиентов с техникой</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card">
+                <div class="stat-number">{{ total_orders }}</div>
+                <div class="stat-label">Связанных заказов</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Поиск и фильтры -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-5">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
+                        <input type="text" name="search" class="form-control"
+                               placeholder="Поиск по названию, модели, серийному номеру..."
+                               value="{{ search_query|default:'' }}">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <select name="transport_type" class="form-select">
+                        <option value="">Все типы</option>
+                        <option value="bicycle" {% if transport_type == 'bicycle' %}selected{% endif %}>Велосипед</option>
+                        <option value="scooter" {% if transport_type == 'scooter' %}selected{% endif %}>Самокат</option>
+                        <option value="ebike" {% if transport_type == 'ebike' %}selected{% endif %}>Электровелосипед</option>
+                        <option value="monowheel" {% if transport_type == 'monowheel' %}selected{% endif %}>Моноколесо</option>
+                        <option value="other" {% if transport_type == 'other' %}selected{% endif %}>Другое</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select name="customer" class="form-select">
+                        <option value="">Все клиенты</option>
+                        {% for customer in customers %}
+                        <option value="{{ customer.id }}" {% if selected_customer == customer.id|stringformat:"s" %}selected{% endif %}>
+                            {{ customer.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter me-1"></i>Применить
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Список техники -->
+    {% if transports %}
+    <div class="row">
+        {% for transport in transports %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card transport-card h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-start gap-3">
+                        <div class="transport-icon flex-shrink-0">
+                            {% if transport.transport_type == 'bicycle' %}
+                                <i class="fas fa-bicycle"></i>
+                            {% elif transport.transport_type == 'scooter' %}
+                                <i class="fas fa-scooter"></i>
+                            {% elif transport.transport_type == 'ebike' %}
+                                <i class="fas fa-motorcycle"></i>
+                            {% elif transport.transport_type == 'monowheel' %}
+                                <i class="fas fa-circle"></i>
+                            {% else %}
+                                <i class="fas fa-tools"></i>
+                            {% endif %}
+                        </div>
+                        <div class="flex-grow-1">
+                            <h5 class="card-title mb-1">
+                                <a href="{% url 'transport_detail' transport.id %}" class="text-decoration-none">
+                                    {{ transport.name }}
+                                </a>
+                            </h5>
+                            <div class="mb-2">
+                                <span class="badge bg-secondary">{{ transport.get_transport_type_display }}</span>
+                                {% if transport.serial_number %}
+                                <span class="badge bg-info">SN: {{ transport.serial_number }}</span>
+                                {% endif %}
+                                {% if transport.color %}
+                                <span class="badge bg-light text-dark">{{ transport.color }}</span>
+                                {% endif %}
+                            </div>
+                            <div class="small text-muted">
+                                <i class="fas fa-user me-1"></i>
+                                <a href="{% url 'customer_detail' transport.customer.id %}" class="text-decoration-none">
+                                    {{ transport.customer.name }}
+                                </a>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mt-3">
+                                <span class="badge bg-primary">
+                                    <i class="fas fa-clipboard-list me-1"></i>{{ transport.orders_count }} заказов
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-transparent border-top-0 pt-0">
+                    <div class="btn-group w-100">
+                        <a href="{% url 'transport_detail' transport.id %}" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-eye me-1"></i>Просмотр
+                        </a>
+                        <a href="{% url 'edit_transport' transport.id %}" class="btn btn-sm btn-outline-secondary">
+                            <i class="fas fa-edit me-1"></i>Редактировать
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Пагинация -->
+    {% if is_paginated %}
+    <nav aria-label="Page navigation" class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if transport_type %}&transport_type={{ transport_type }}{% endif %}">
+                    <i class="fas fa-angle-double-left"></i>
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if transport_type %}&transport_type={{ transport_type }}{% endif %}">
+                    <i class="fas fa-angle-left"></i>
+                </a>
+            </li>
+            {% endif %}
+
+            <li class="page-item active">
+                <span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+            </li>
+
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if transport_type %}&transport_type={{ transport_type }}{% endif %}">
+                    <i class="fas fa-angle-right"></i>
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if transport_type %}&transport_type={{ transport_type }}{% endif %}">
+                    <i class="fas fa-angle-double-right"></i>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+
+    {% else %}
+    <div class="text-center py-5">
+        <i class="fas fa-bicycle fa-4x text-muted mb-3"></i>
+        <h5 class="text-muted">Нет техники</h5>
+        <p class="text-muted">Добавьте первую единицу техники для клиента</p>
+        <a href="{% url 'create_transport' %}" class="btn btn-primary mt-2">
+            <i class="fas fa-plus me-1"></i>Добавить технику
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

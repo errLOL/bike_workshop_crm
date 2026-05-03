@@ -1,0 +1,364 @@
+{% extends 'inventorymanager/layout.html' %}
+{% load static %}
+
+{% block title %}Отчёт по зарплатам{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chart-card {
+        border-radius: 16px;
+        border: none;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        margin-bottom: 1.5rem;
+        overflow: hidden;
+    }
+    .chart-card .card-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 0.75rem 1.25rem;
+        font-weight: 500;
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <h2 class="mb-0">
+            <i class="fas fa-chart-line me-2 text-primary"></i>Зарплаты техников
+        </h2>
+        <div class="d-flex gap-2">
+            <button onclick="window.print();" class="btn btn-outline-secondary">
+                <i class="fas fa-print me-1"></i>Печать
+            </button>
+            <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left me-1"></i>На дашборд
+            </a>
+        </div>
+    </div>
+
+    <!-- Выбор периода -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label small text-muted">Период</label>
+                    <select name="period" class="form-select" id="periodSelect">
+                        <option value="week" {% if period_type == 'week' %}selected{% endif %}>Неделя</option>
+                        <option value="month" {% if period_type == 'month' %}selected{% endif %}>Месяц</option>
+                        <option value="quarter" {% if period_type == 'quarter' %}selected{% endif %}>Квартал</option>
+                        <option value="year" {% if period_type == 'year' %}selected{% endif %}>Год</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small text-muted">Дата</label>
+                    <select name="date" class="form-select" id="dateSelect">
+                        {% if period_type == 'week' %}
+                            {% for week in available_weeks %}
+                            <option value="{{ week.value }}" {% if start_date|date:"Y-m-d" == week.value %}selected{% endif %}>
+                                {{ week.label }}
+                            </option>
+                            {% endfor %}
+                        {% elif period_type == 'month' %}
+                            {% for month in available_months %}
+                            <option value="{{ month.value }}" {% if start_date|date:"Y-m" == month.value %}selected{% endif %}>
+                                {{ month.label }}
+                            </option>
+                            {% endfor %}
+                        {% elif period_type == 'quarter' %}
+                            {% for quarter in available_quarters %}
+                            <option value="{{ quarter.value }}" {% if quarter.label == period_label %}selected{% endif %}>
+                                {{ quarter.label }}
+                            </option>
+                            {% endfor %}
+                        {% elif period_type == 'year' %}
+                            {% for year in available_years %}
+                            <option value="{{ year.value }}" {% if start_date|date:"Y" == year.value %}selected{% endif %}>
+                                {{ year.label }}
+                            </option>
+                            {% endfor %}
+                        {% endif %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-chart-line me-1"></i>Показать
+                    </button>
+                </div>
+                <div class="col-md-2">
+                    <a href="{% url 'salary_report' %}" class="btn btn-outline-secondary w-100">
+                        <i class="fas fa-redo me-1"></i>Сброс
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Инфо-блок -->
+    <div class="alert alert-info d-flex align-items-center mb-4">
+        <i class="fas fa-info-circle fa-2x me-3"></i>
+        <div>
+            <strong>Период:</strong> {{ period_label }}<br>
+            <strong>Всего техников:</strong> {{ technicians_count }}
+        </div>
+    </div>
+
+    <!-- Графики -->
+    <div class="row mb-4">
+        <!-- График динамики выручки -->
+        <div class="col-lg-7">
+            <div class="chart-card">
+                <div class="card-header">
+                    <i class="fas fa-chart-area me-2"></i>Динамика выручки от услуг
+                </div>
+                <div class="card-body">
+                    <canvas id="revenueChart" width="100%" height="60"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- График топ-5 техников -->
+        <div class="col-lg-5">
+            <div class="chart-card">
+                <div class="card-header">
+                    <i class="fas fa-trophy me-2"></i>Топ-5 техников по выручке
+                </div>
+                <div class="card-body">
+                    <canvas id="topTechniciansChart" width="100%" height="60"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Итоги -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-light border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="text-muted small text-uppercase">Общая выручка от услуг</div>
+                    <div class="h2">{{ total_services|floatformat:2 }} ₽</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-white border-0 shadow-sm" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                <div class="card-body text-center">
+                    <div class="small opacity-75">Средняя выручка на техника</div>
+                    <div class="h2 mb-0">{{ avg_service_per_technician|floatformat:2 }} ₽</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-white border-0 shadow-sm" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                <div class="card-body text-center">
+                    <div class="small opacity-75">Общий фонд зарплаты</div>
+                    <div class="h2 mb-0">{{ total_salary|floatformat:2 }} ₽</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Таблица зарплат -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-white py-3">
+            <h5 class="mb-0">
+                <i class="fas fa-table me-2 text-primary"></i>Детализация по сотрудникам
+            </h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Сотрудник</th>
+                            <th>Процент</th>
+                            <th class="text-end">Выручка от услуг</th>
+                            <th class="text-end">Зарплата</th>
+                            <th class="text-end">Заказов</th>
+                            <th class="text-end">Ср. чек</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in salary_data %}
+                        <td>
+                            <td>{{ forloop.counter }}</a></td>
+                            <td>
+                                <strong>{{ item.user.get_full_name|default:item.user.username }}</strong>
+                                <div class="small text-muted">{{ item.user.email }}</div>
+                             </td>
+                            <td>{{ item.percent }}%</td>
+                            <td class="text-end">{{ item.services_total|floatformat:2 }} ₽</td>
+                            <td class="text-end fw-bold text-success">{{ item.salary|floatformat:2 }} ₽</td>
+                            <td class="text-end">{{ item.orders_count }}</td>
+                            <td class="text-end">{% if item.orders_count %}{{ avg_order_value|floatformat:2 }} ₽{% else %}—{% endif %}</td>
+                         </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center py-4 text-muted">
+                                <i class="fas fa-chart-line fa-2x mb-2 d-block"></i>
+                                Нет данных за выбранный период
+                             </td>
+                         </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-light fw-bold">
+                        <tr>
+                            <td colspan="3">Итого</td>
+                            <td class="text-end">{{ total_services|floatformat:2 }} ₽</td>
+                            <td class="text-end">{{ total_salary|floatformat:2 }} ₽</td>
+                            <td class="text-end">{{ salary_data|length }}</td>
+                            <td class="text-end">—</td>
+                         </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const periodSelect = document.getElementById('periodSelect');
+    const dateSelect = document.getElementById('dateSelect');
+
+    // При смене периода
+    if (periodSelect) {
+        periodSelect.addEventListener('change', function() {
+            const url = new URL(window.location.href);
+            url.searchParams.set('period', this.value);
+            url.searchParams.delete('date');
+            window.location.href = url.toString();
+        });
+    }
+
+    // График динамики выручки
+    const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+    const chartLabels = {{ chart_labels|safe }};
+    const chartServicesData = {{ chart_services_data|safe }};
+    const chartSalaryData = {{ chart_salary_data|safe }};
+
+    new Chart(revenueCtx, {
+        type: 'line',
+        data: {
+            labels: chartLabels,
+            datasets: [
+                {
+                    label: 'Выручка от услуг (₽)',
+                    data: chartServicesData,
+                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                    borderColor: '#667eea',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#667eea',
+                    pointBorderColor: '#fff',
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    fill: true,
+                    tension: 0.3
+                },
+                {
+                    label: 'Фонд зарплаты (₽)',
+                    data: chartSalaryData,
+                    backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                    borderColor: '#28a745',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#28a745',
+                    pointBorderColor: '#fff',
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    fill: true,
+                    tension: 0.3
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                yAxes: [{
+                    ticks: {
+                        beginAtZero: true,
+                        callback: function(value) {
+                            return value.toLocaleString() + ' ₽';
+                        }
+                    }
+                }],
+                xAxes: [{
+                    gridLines: { display: false }
+                }]
+            },
+            tooltips: {
+                callbacks: {
+                    label: function(tooltipItem, data) {
+                        const label = data.datasets[tooltipItem.datasetIndex].label || '';
+                        const value = tooltipItem.yLabel;
+                        return label + ': ' + value.toLocaleString() + ' ₽';
+                    }
+                }
+            },
+            legend: {
+                position: 'top',
+                labels: { boxWidth: 12, usePointStyle: true }
+            }
+        }
+    });
+
+    // График топ-5 техников
+    const topCtx = document.getElementById('topTechniciansChart').getContext('2d');
+    const topLabels = {{ top_technicians_labels|safe }};
+    const topData = {{ top_technicians_data|safe }};
+
+    new Chart(topCtx, {
+        type: 'bar',
+        data: {
+            labels: topLabels,
+            datasets: [{
+                label: 'Выручка от услуг (₽)',
+                data: topData,
+                backgroundColor: 'rgba(102, 126, 234, 0.7)',
+                borderColor: '#667eea',
+                borderWidth: 1,
+                borderRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                yAxes: [{
+                    ticks: {
+                        beginAtZero: true,
+                        callback: function(value) {
+                            return value.toLocaleString() + ' ₽';
+                        }
+                    }
+                }],
+                xAxes: [{
+                    ticks: { autoSkip: false },
+                    gridLines: { display: false }
+                }]
+            },
+            tooltips: {
+                callbacks: {
+                    label: function(tooltipItem, data) {
+                        return 'Выручка: ' + tooltipItem.yLabel.toLocaleString() + ' ₽';
+                    }
+                }
+            },
+            legend: { display: false }
+        }
+    });
+
+    // Если дат нет, показываем сообщение
+    if (dateSelect && dateSelect.options.length === 0) {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'Нет данных за этот период';
+        dateSelect.appendChild(option);
+        dateSelect.disabled = true;
+    }
+});
+</script>
+{% endblock %}

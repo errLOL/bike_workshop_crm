@@ -1,0 +1,52 @@
+{% extends "inventorymanager/layout.html" %}
+
+
+{% block body %}
+{% if messages %}
+    <div class="alert alert-success alert-dismissible fade show mt-2" role="alert">
+        {% for message in messages %}
+            {{ message }}
+        {% endfor %}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+{% endif %}
+
+<h1 class="mt-4">Suppliers</h1>
+
+<a type="button" class="btn btn-primary mb-2" href="{% url 'create_supplier' %}">Add Supplier</a>
+
+<div class="container"></div>
+    <div class="card shadow mb-4">
+            <div class="card-header py-3">
+            
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table id="suppliersTable" class="table table-bordered" data-type="supplier" width="100%" cellspacing="0">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Contact Name</th>
+                                <th>Email</th>
+                                <th>Phone</th>
+                    
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for supplier in suppliers %}
+                            <tr data-id="{{ supplier.id }}">
+                                <td>{{ supplier.name}}</td>
+                                <td>{{ supplier.contact_name}}</td>
+                                <td>{{ supplier.contact_email}}</td>
+                                <td>{{ supplier.contact_phone}}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+
+            </div>
+        </div>
+</div>
+
+
+{% endblock body %}

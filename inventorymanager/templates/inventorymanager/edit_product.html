@@ -1,0 +1,282 @@
+{% extends 'inventorymanager/layout.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% load i18n %}
+
+{% block title %}
+    {% if form.instance.pk %}Редактирование товара{% else %}Добавление товара{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .product-form-card {
+        border-radius: 16px;
+        border: none;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        overflow: hidden;
+    }
+    .product-form-card .card-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 1rem 1.5rem;
+    }
+    .product-form-card .card-header h4 {
+        margin: 0;
+        font-weight: 600;
+    }
+    .product-form-card .card-body {
+        padding: 2rem;
+    }
+    .image-preview {
+        width: auto;
+        height: 160px;
+        object-fit: cover;
+        border-radius: 12px;
+        border: 2px solid #e9ecef;
+    }
+    .image-preview:hover {
+        border-color: #667eea;
+    }
+    .current-image {
+        background: #f8f9fa;
+        padding: 1rem;
+        border-radius: 12px;
+        text-align: center;
+    }
+    .stock-badge {
+        font-size: 0.85rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 20px;
+    }
+    /* Стили для crispy форм на русском */
+    .form-label {
+        font-weight: 500;
+        color: #2c3e50;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    }
+    @media (max-width: 768px) {
+        .product-form-card .card-body {
+            padding: 1rem;
+        }
+
+        .current-image .d-flex {
+            flex-direction: column;
+            text-align: center;
+            gap: 0.75rem !important;
+        }
+        .preview-container .d-flex {
+            flex-direction: column;
+            text-align: center;
+            gap: 0.75rem !important;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="product-form-card">
+                <div class="card-header">
+                    <h4>
+                        <i class="fas {% if form.instance.pk %}fa-edit{% else %}fa-plus-circle{% endif %} me-2"></i>
+                        {% if form.instance.pk %}
+                            Редактирование товара
+                        {% else %}
+                            Новый товар
+                        {% endif %}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data" id="product-form">
+                        {% csrf_token %}
+
+                        <!-- Текущее изображение -->
+                        {% if form.instance.image %}
+                        <div class="current-image mb-4">
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                                <div class="d-flex align-items-center gap-3 flex-wrap">
+                                    <img src="{{ form.instance.image.url }}" alt="{{ form.instance.name }}" class="image-preview">
+                                    <div>
+                                        <strong>Текущее изображение</strong>
+                                        <div class="text-muted small mt-1">Нажмите на поле "Изображение" чтобы заменить</div>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-danger" id="remove-image-btn">
+                                    <i class="fas fa-trash-alt me-1"></i>Удалить
+                                </button>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Превью нового изображения -->
+                        <div id="preview-container" class="mb-4" style="display: none;">
+                            <div class="d-flex align-items-center gap-3 flex-wrap">
+                                <img id="image-preview" src="#" alt="Preview" class="image-preview">
+                                <div>
+                                    <strong>Новое изображение</strong>
+                                    <div class="text-muted small mt-1">Файл выбран. Сохраните форму, чтобы применить.</div>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="clear-preview-btn">
+                                    <i class="fas fa-times me-1"></i>Отменить
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Поля формы -->
+                        <div class="row">
+                            <div class="col-md-8">
+                                {{ form.name|as_crispy_field }}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form.product_type|as_crispy_field }}
+                            </div>
+                        </div>
+
+                        {{ form.description|as_crispy_field }}
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                {{ form.category|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.supplier|as_crispy_field }}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4">
+                                {{ form.unit_cost|as_crispy_field }}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form.quantity_in_stock|as_crispy_field }}
+                            </div>
+                        </div>
+
+                        {{ form.image|as_crispy_field }}
+
+                        <!-- Кнопки действий -->
+                        <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                            <a href="{% url 'products' %}" class="btn btn-secondary">
+                                <i class="fas fa-times me-1"></i>Отмена
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i>
+                                {% if form.instance.pk %}Сохранить{% else %}Добавить{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const imageInput = document.querySelector('#id_image');
+    const previewContainer = document.getElementById('preview-container');
+    const previewImg = document.getElementById('image-preview');
+    const clearPreviewBtn = document.getElementById('clear-preview-btn');
+    const removeImageBtn = document.getElementById('remove-image-btn');
+
+    // Превью при выборе файла
+    if (imageInput) {
+        imageInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    previewImg.src = event.target.result;
+                    previewContainer.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            } else {
+                previewContainer.style.display = 'none';
+            }
+        });
+    }
+
+    // Очистка превью
+    if (clearPreviewBtn) {
+        clearPreviewBtn.addEventListener('click', function() {
+            imageInput.value = '';
+            previewContainer.style.display = 'none';
+        });
+    }
+
+    // Удаление существующего изображения
+    if (removeImageBtn) {
+        removeImageBtn.addEventListener('click', function() {
+            if (confirm('Удалить изображение?')) {
+                // Добавляем скрытое поле для удаления
+                const hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                hiddenInput.name = 'clear_image';
+                hiddenInput.value = 'true';
+                document.getElementById('product-form').appendChild(hiddenInput);
+
+                // Скрываем блок с текущим изображением
+                document.querySelector('.current-image').style.display = 'none';
+                removeImageBtn.style.display = 'none';
+            }
+        });
+    }
+
+    // Индикация остатка
+    const stockInput = document.querySelector('#id_quantity_in_stock');
+    const reorderLevel = document.querySelector('#id_reorder_level');
+
+    function updateStockIndicator() {
+        if (!stockInput) return;
+        const stock = parseInt(stockInput.value) || 0;
+        const level = parseInt(reorderLevel ? reorderLevel.value : 5) || 5;
+
+        stockInput.classList.remove('is-valid', 'is-warning', 'is-invalid');
+        
+        if (stock === 0) {
+            stockInput.classList.add('is-invalid');
+        } else if (stock <= level) {
+            stockInput.classList.add('is-warning');
+        } else {
+            stockInput.classList.add('is-valid');
+        }
+    }
+    
+    if (stockInput) {
+        stockInput.addEventListener('input', updateStockIndicator);
+        updateStockIndicator();
+    }
+    const productTypeSelect = document.querySelector('#id_product_type');
+    const quantityField = document.querySelector('#div_id_quantity_in_stock');
+
+    function toggleQuantityField() {
+        if (!productTypeSelect || !quantityField) return;
+
+        const isService = productTypeSelect.value === 'service';
+
+        if (isService) {
+            // Если услуга — скрываем поле количества и устанавливаем значение 0
+            quantityField.style.display = 'none';
+            const quantityInput = document.querySelector('#id_quantity_in_stock');
+            if (quantityInput) quantityInput.value = 0;
+        } else {
+            // Если товар — показываем поле
+            quantityField.style.display = 'block';
+        }
+    }
+
+    // Следим за изменением типа товара
+    if (productTypeSelect) {
+        productTypeSelect.addEventListener('change', toggleQuantityField);
+        // Вызываем при загрузке страницы
+        toggleQuantityField();
+    }
+});
+</script>
+{% endblock %}

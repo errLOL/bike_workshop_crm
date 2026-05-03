@@ -1,0 +1,71 @@
+{% extends "inventorymanager/layout.html" %}
+{% load crispy_forms_tags %}
+
+
+{% block body %}
+{% if messages %}
+<div class="messages mt-2">
+
+        {% for message in messages %}
+        <!-- Warning Messages-->
+                {% if message.level == DEFAULT_MESSAGE_LEVELS.ERROR %}
+                        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                        <span{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</span>
+                        </div>        
+                {% endif %}
+        
+        {% endfor %}
+
+</div>
+{% endif %}
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0">
+                        {% if form.instance.pk %}
+                            <i class="fas fa-edit me-2"></i>Редактирование: {{ form.instance.name }}
+                        {% else %}
+                            <i class="fas fa-plus me-2"></i>Новый товар/услуга
+                        {% endif %}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+
+                        {% if form.instance.pk and form.instance.image %}
+                        <div class="mb-4 text-center">
+                            <img src="{{ form.instance.image.url }}"
+                                 alt="{{ form.instance.name }}"
+                                 style="max-width: 200px; max-height: 200px;"
+                                 class="img-thumbnail">
+                            <div class="mt-2">
+                                <small class="text-muted">Текущее изображение</small>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        {{ form|crispy }}
+
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <a href="{% url 'products' %}" class="btn btn-secondary">
+                                <i class="fas fa-times me-1"></i>Отмена
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i>Сохранить
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+{% endblock body %}
+

@@ -1,0 +1,128 @@
+{% extends 'inventorymanager/layout.html' %}
+{% load static %}
+
+{% block title %}Касса{% endblock %}
+
+{% block body %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <h2 class="mb-0">
+            <i class="fas fa-cash-register me-2 text-primary"></i>Касса: {{ cash_register.name }}
+        </h2>
+        <div class="d-flex gap-2">
+            <a href="{% url 'cash_transaction_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i>Новая операция
+            </a>
+            <a href="{% url 'cash_register_close_shift' cash_register.id %}" class="btn btn-outline-secondary">
+                <i class="fas fa-chart-line me-1"></i>Закрыть смену
+            </a>
+        </div>
+    </div>
+    
+    <!-- Баланс -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="small">Приход</div>
+                    <div class="h3">+{{ total_income|floatformat:2 }} ₽</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <div class="small">Расход</div>
+                    <div class="h3">-{{ total_expense|floatformat:2 }} ₽</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="small">Текущий остаток</div>
+                    <div class="h3">{{ current_balance|floatformat:2 }} ₽</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Таблица операций -->
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <!-- Фильтры -->
+            <form method="get" class="row g-3 mb-4">
+                <div class="col-md-3">
+                    <select name="operation_type" class="form-select">
+                        <option value="">Все операции</option>
+                        <option value="income" {% if operation_type_filter == 'income' %}selected{% endif %}>Приход</option>
+                        <option value="expense" {% if operation_type_filter == 'expense' %}selected{% endif %}>Расход</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select name="payment_method" class="form-select">
+                        <option value="">Все способы</option>
+                        <option value="cash" {% if payment_method_filter == 'cash' %}selected{% endif %}>Наличные</option>
+                        <option value="card" {% if payment_method_filter == 'card' %}selected{% endif %}>Карта</option>
+                        <option value="transfer" {% if payment_method_filter == 'transfer' %}selected{% endif %}>Перевод</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <input type="date" name="date_from" class="form-control" value="{{ date_from }}" placeholder="С даты">
+                </div>
+                <div class="col-md-2">
+                    <input type="date" name="date_to" class="form-control" value="{{ date_to }}" placeholder="По дату">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">Фильтр</button>
+                </div>
+            </form>
+            
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Дата</th>
+                            <th>Тип</th>
+                            <th>Сумма</th>
+                            <th>Способ</th>
+                            <th>Основание</th>
+                            <th>Сотрудник</th>
+                            <th>Заказ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in transactions %}
+                        <tr>
+                            <td>{{ t.created_at|date:"d.m.Y H:i" }}</td>
+                            <td>
+                                {% if t.operation_type == 'income' %}
+                                    <span class="badge bg-success">Приход</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Расход</span>
+                                {% endif %}
+                            </td>
+                            <td class="fw-bold">{{ t.amount|floatformat:2 }} ₽</td>
+                            <td>{{ t.get_payment_method_display }}</td>
+                            <td>{{ t.reason }}</td>
+                            <td>{{ t.employee.get_full_name|default:t.employee.username }}</td>
+                            <td>
+                                {% if t.order %}
+                                    <a href="{% url 'order_detail' t.order.id %}">#{{ t.order.id }}</a>
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                         </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center">Нет операций</td>
+                         </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

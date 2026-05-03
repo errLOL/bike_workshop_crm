@@ -1,0 +1,219 @@
+{% extends 'inventorymanager/layout.html' %}
+{% load static %}
+
+{% block title %}Клиенты - Мастерская{% endblock %}
+
+{% block extra_css %}
+<style>
+    .customer-card {
+        transition: all 0.2s ease;
+        border: none;
+        border-radius: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .customer-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    }
+    .customer-avatar {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.5rem;
+        font-weight: 600;
+    }
+    .stat-card {
+        background: white;
+        border-radius: 16px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        border-left: 4px solid #667eea;
+    }
+    .stat-number {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #2c3e50;
+    }
+    .stat-label {
+        color: #6c757d;
+        font-size: 0.85rem;
+    }
+    @media (max-width: 768px) {
+        .customer-avatar {
+            width: 50px;
+            height: 50px;
+            font-size: 1.2rem;
+        }
+        .stat-number {
+            font-size: 1.5rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container-fluid py-4">
+    <!-- Заголовок -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <h2 class="mb-0">
+            <i class="fas fa-users me-2 text-primary"></i>Клиенты
+        </h2>
+        <a href="{% url 'create_customer' %}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i>Добавить клиента
+        </a>
+    </div>
+
+    <!-- Статистика -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="stat-card">
+                <div class="stat-number">{{ total_customers }}</div>
+                <div class="stat-label">Всего клиентов</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card">
+                <div class="stat-number">{{ active_customers }}</div>
+                <div class="stat-label">С активными заказами</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card">
+                <div class="stat-number">{{ total_orders }}</div>
+                <div class="stat-label">Всего заказов</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Поиск -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-8">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
+                        <input type="text" name="search" class="form-control"
+                               placeholder="Поиск по имени, телефону или Telegram..."
+                               value="{{ search_query|default:'' }}">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search me-1"></i>Найти
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Список клиентов -->
+    {% if customers %}
+    <div class="row">
+        {% for customer in customers %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card customer-card h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-start gap-3">
+                        <div class="customer-avatar flex-shrink-0">
+                            {{ customer.name|first|upper }}
+                        </div>
+                        <div class="flex-grow-1">
+                            <h5 class="card-title mb-1">
+                                <a href="{% url 'customer_detail' customer.id %}" class="text-decoration-none">
+                                    {{ customer.name }}
+                                </a>
+                            </h5>
+                            <div class="mb-2">
+                                {% if customer.phone %}
+                                <a href="tel:{{ customer.phone }}" class="text-muted text-decoration-none small">
+                                    <i class="fas fa-phone me-1"></i>{{ customer.formatted_phone }}
+                                </a>
+                                {% endif %}
+                                {% if customer.telegram %}
+                                <span class="mx-1">•</span>
+                                <a href="https://t.me/{{ customer.telegram }}" target="_blank" class="text-muted text-decoration-none small">
+                                    <i class="fab fa-telegram me-1"></i>@{{ customer.telegram }}
+                                </a>
+                                {% endif %}
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mt-3">
+                                <span class="badge bg-secondary">
+                                    <i class="fas fa-bicycle me-1"></i>{{ customer.transports_count }} техники
+                                </span>
+                                <span class="badge bg-primary">
+                                    <i class="fas fa-clipboard-list me-1"></i>{{ customer.orders_count }} заказов
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-transparent border-top-0 pt-0">
+                    <div class="btn-group w-100">
+                        <a href="{% url 'customer_detail' customer.id %}" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-eye me-1"></i>Просмотр
+                        </a>
+                        <a href="{% url 'edit_customer' customer.id %}" class="btn btn-sm btn-outline-secondary">
+                            <i class="fas fa-edit me-1"></i>Редактировать
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Пагинация -->
+    {% if is_paginated %}
+    <nav aria-label="Page navigation" class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}">
+                    <i class="fas fa-angle-double-left"></i>
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}">
+                    <i class="fas fa-angle-left"></i>
+                </a>
+            </li>
+            {% endif %}
+
+            <li class="page-item active">
+                <span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+            </li>
+
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}">
+                    <i class="fas fa-angle-right"></i>
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}">
+                    <i class="fas fa-angle-double-right"></i>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+
+    {% else %}
+    <div class="text-center py-5">
+        <i class="fas fa-users fa-4x text-muted mb-3"></i>
+        <h5 class="text-muted">Нет клиентов</h5>
+        <p class="text-muted">Добавьте первого клиента, нажав кнопку "Добавить клиента"</p>
+        <a href="{% url 'create_customer' %}" class="btn btn-primary mt-2">
+            <i class="fas fa-plus me-1"></i>Добавить клиента
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

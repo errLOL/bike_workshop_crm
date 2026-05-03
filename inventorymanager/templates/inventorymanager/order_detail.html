@@ -1,0 +1,693 @@
+{% extends "inventorymanager/layout.html" %}
+{% load crispy_forms_tags %}
+{% block title %}Заказ №{{ order.id }} - Мастерская{% endblock %}
+
+{% if messages %}
+    <div class="alert alert-success alert-dismissible fade show mt-2" role="alert">
+        {% for message in messages %}
+            {{ message }}
+        {% endfor %}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+{% endif %}
+
+
+{% block extra_css %}
+<style>
+    .detail-card {
+        border-radius: 16px;
+        border: none;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        margin-bottom: 1.5rem;
+        overflow: hidden;
+    }
+    .detail-card .card-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 1rem 1.5rem;
+        font-weight: 600;
+    }
+    .status-badge {
+        padding: 0.4rem 1rem;
+        border-radius: 30px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    .info-row {
+        display: flex;
+        padding: 0.75rem;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    .info-label {
+        width: 140px;
+        font-weight: 600;
+        color: #6c757d;
+    }
+    .info-value {
+        flex: 1;
+        color: #2c3e50;
+    }
+    .items-table {
+        margin-bottom: 0;
+    }
+    .items-table th {
+        background-color: #f8f9fa;
+        border-bottom: 2px solid #e9ecef;
+        font-weight: 600;
+        color: #495057;
+    }
+    .total-row {
+        background-color: #f8f9fa;
+        font-weight: 700;
+        font-size: 1.1rem;
+    }
+    .action-buttons {
+        display: flex;
+        gap: 0.75rem;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+    }
+    .payment-card {
+        background: #f8f9fa;
+        border-left: 4px solid #28a745;
+    }
+    @media print {
+        .no-print {
+            display: none;
+        }
+        .detail-card {
+            box-shadow: none;
+            border: 1px solid #ddd;
+        }
+        .action-buttons {
+            display: none;
+        }
+    }
+    .upload-area {
+        transition: all 0.2s ease;
+    }
+    .upload-area .border {
+        transition: all 0.2s ease;
+    }
+    .upload-area .border:hover {
+        background-color: #e9ecef !important;
+        transform: translateY(-2px);
+    }
+    .photo-item {
+        transition: transform 0.2s ease;
+    }
+    .photo-item:hover {
+        transform: scale(1.02);
+    }
+</style>
+{% endblock %}
+{% block body %}
+<div class="container-fluid py-4">
+    <nav aria-label="breadcrumb" class="mb-4 no-print">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'orders' %}">Заказы</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Заказ №{{ order.id }}</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <!-- Левая колонка - информация о заказе -->
+        <div class="col-lg-4">
+            <div class="detail-card">
+                <div class="card-header">
+                    <i class="fas fa-info-circle me-2"></i>Информация о заказе
+                </div>
+                <div class="card-body">
+                    <div class="info-row">
+                        <div class="info-label">Номер заказа:</div>
+                        <div class="info-value"><strong>#{{ order.id }}</strong></div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Дата создания:</div>
+                        <div class="info-value">{{ order.created_at|date:"d.m.Y H:i" }}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Статус:</div>
+                        <div class="info-value">
+                            {% if order.status == 'in_work' %}
+                                <span class="status-badge bg-info ">🔄 В работе</span>
+                            {% elif order.status == 'waiting_spareparts' %}
+                                <span class="status-badge bg-warning">⏳ Ожидает запчасти</span>
+                            {% elif order.status == 'ready' %}
+                                <span class="status-badge bg-success text-white">✅ Готов</span>
+                            {% elif order.status == 'accepted' %}
+                                <span class="status-badge bg-primary text-white">🆕 Новый</span>
+                            {% else %}
+                                <span class="status-badge bg-secondary">📁 Выдан</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Сотрудник:</div>
+                        <div class="info-value">{{ order.employee.get_full_name|default:order.employee.username|default:"—" }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Информация о клиенте -->
+            <div class="detail-card">
+                <div class="card-header">
+                    <i class="fas fa-user me-2"></i>Клиент
+                </div>
+                <div class="card-body">
+                    <div class="info-row">
+                        <div class="info-label">Имя:</div>
+                        <div class="info-value"><strong>{{ order.customer.name|default:"—" }}</strong></div>
+                    </div>
+                    {% if order.customer.phone %}
+                    <div class="info-row">
+                        <div class="info-label">Телефон:</div>
+                        <div class="info-value">
+                            <a href="tel:{{ order.customer.phone }}">{{ order.customer.phone }}</a>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if order.customer.telegram %}
+                    <div class="info-row">
+                        <div class="info-label">Telegram:</div>
+                        <div class="info-value">{{ order.customer.telegram }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Информация о технике -->
+            <div class="detail-card">
+                <div class="card-header">
+                    <i class="fas fa-bicycle me-2"></i>Техника
+                </div>
+                <div class="card-body">
+                    <div class="info-row">
+                        <div class="info-label">Название:</div>
+                        <div class="info-value"><strong>{{ order.transport.name|default:"—" }}</strong></div>
+                    </div>
+                    {% if order.transport.transport_type %}
+                    <div class="info-row">
+                        <div class="info-label">Тип:</div>
+                        <div class="info-value">{{ order.transport.get_transport_type_display }}</div>
+                    </div>
+                    {% endif %}
+                    {% if order.transport.serial_number %}
+                    <div class="info-row">
+                        <div class="info-label">Серийный номер:</div>
+                        <div class="info-value"><code>{{ order.transport.serial_number }}</code></div>
+                    </div>
+                    {% endif %}
+                    {% if order.transport.color %}
+                    <div class="info-row">
+                        <div class="info-label">Цвет:</div>
+                        <div class="info-value">{{ order.transport.color }}</div>
+                    </div>
+                    {% endif %}
+                    {% if order.transport.comment %}
+                    <div class="info-row">
+                        <div class="info-label">Комментарий:</div>
+                        <div class="info-value">{{ order.transport.comment }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            <!-- Блок фото транспорта -->
+            <div class="detail-card">
+            <div class="card-header">
+                <i class="fas fa-camera me-2"></i>Фото транспорта
+            </div>
+            <div class="card-body">
+                <!-- Область для загрузки / камера -->
+                <div class="upload-area mb-4" id="uploadArea">
+                    <input type="file" id="photoInput" accept="image/*" capture="environment" style="display: none;">
+                    <div class="text-center p-4 border rounded-3 bg-light" style="cursor: pointer; transition: all 0.2s;" id="uploadTrigger">
+                        <i class="fas fa-camera fa-3x text-primary mb-2"></i>
+                        <div class="fw-bold">Сделать фото или загрузить</div>
+                        <div class="small text-muted mt-1">Нажмите, чтобы открыть камеру или выбрать из галереи</div>
+                    </div>
+                    <div id="previewArea" class="mt-3" style="display: none;">
+                        <div class="d-flex align-items-center gap-3 p-3 bg-light rounded">
+                            <img id="imagePreview" src="#" alt="Preview" style="width: 80px; height: 80px; object-fit: cover; border-radius: 12px;">
+                            <div class="flex-grow-1">
+                                <div class="fw-bold" id="previewFileName"></div>
+                                <div class="small text-muted mt-1">Фото будет добавлено после сохранения</div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-danger" id="cancelPreviewBtn">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <input type="hidden" name="pending_photo" id="pendingPhoto" value="">
+                    <textarea name="photo_description" id="photoDescription" class="form-control mt-2" rows="1" placeholder="Описание (что видно на фото, например: повреждение рамы, серийный номер...)" style="display: none;"></textarea>
+                    <button type="button" id="confirmUploadBtn" class="btn btn-primary mt-2 w-100" style="display: none;">
+                        <i class="fas fa-check me-1"></i>Добавить фото
+                    </button>
+                </div>
+
+                <!-- Галерея фото -->
+                {% with order.transport.images.all as images %}
+                {% if images %}
+                <div class="mt-3">
+                    <div class="text-muted small mb-2">
+                        <i class="fas fa-images me-1"></i>Все фото ({{ images|length }})
+                    </div>
+                    <div class="row g-2">
+                        {% for img in images %}
+                        <div class="col-4 col-md-3">
+                            <div class="position-relative photo-item">
+                                <img src="{{ img.image.url }}" alt="{{ img.description|default:'Фото' }}"
+                                     class="img-fluid rounded w-100" style="height: 100px; object-fit: cover; cursor: pointer;"
+                                     onclick="showImageModal('{{ img.image.url }}', '{{ img.description|default:'' }}', '{{ img.created_at|date:'d.m.Y H:i' }}', '{{ img.uploaded_by.get_full_name|default:img.uploaded_by.username }}')">
+                                {% if img.description %}
+                                <div class="small text-muted mt-1 text-truncate">{{ img.description }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center py-4 text-muted">
+                    <i class="fas fa-camera fa-2x mb-2 d-block"></i>
+                    <div>Нет фото</div>
+                    <div class="small">Сделайте фото при приёме в ремонт</div>
+                </div>
+                {% endif %}
+                {% endwith %}
+            </div>
+            <div class="modal fade" id="imageModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Фото транспорта</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body text-center">
+                            <img src="" id="modalImage" class="img-fluid" alt="Фото">
+                            <p id="modalDescription" class="mt-2 text-muted"></p>
+                            <p id="modalMeta" class="small text-muted"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            </div>
+            <!-- Блок оплаты -->
+            <div class="detail-card payment-card">
+                <div class="card-header" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">
+                    <i class="fas fa-credit-card me-2"></i>Оплата
+                </div>
+                <div class="card-body">
+                    <div class="info-row">
+                        <div class="info-label">Сумма заказа:</div>
+                        <div class="info-value"><strong>{{ order.total_amount|floatformat:2 }} ₽</strong></div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Оплачено:</div>
+                        <div class="info-value text-success">
+                            <strong>{{ order.total_paid|floatformat:2 }} ₽</strong>
+                        </div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">
+                            Долг:
+                            {% if order.debt > 0 %}
+                                <span class="badge bg-warning text-dark ms-1">Ожидает оплаты</span>
+                            {% else %}
+                                <span class="badge bg-success ms-1">Оплачено полностью</span>
+                            {% endif %}
+                        </div>
+                        <div class="info-value {% if order.debt > 0 %}text-danger fw-bold{% else %}text-success{% endif %}">
+                            {{ order.debt|floatformat:2 }} ₽
+                        </div>
+                    </div>
+
+                    {% if order.debt > 0 and order.status != 'issued' %}
+                    <div class="mt-3">
+                        <button type="button" class="btn btn-success w-100" data-bs-toggle="modal" data-bs-target="#paymentModal">
+                            <i class="fas fa-plus-circle me-1"></i>Внести платеж
+                        </button>
+                    </div>
+                    {% endif %}
+
+                    <!-- История оплат -->
+                    {% if order.payments.all %}
+                    <div class="mt-4">
+                        <div class="text-muted small mb-2">История оплат</div>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-borderless">
+                                <thead>
+                                    <tr>
+                                        <th>Дата</th>
+                                        <th>Сумма</th>
+                                        <th>Способ</th>
+                                        <th>Сотрудник</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for payment in order.payments.all %}
+                                    <tr>
+                                        <td class="small">{{ payment.created_at|date:"d.m.Y H:i" }}</td>
+                                        <td class="fw-bold text-success">{{ payment.amount|floatformat:2 }} ₽</td>
+                                        <td class="small">{{ payment.get_payment_method_display }}</td>
+                                        <td class="small">{{ payment.employee.get_full_name|default:payment.employee.username }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Правая колонка - позиции заказа -->
+        <div class="col-lg-8">
+            <div class="detail-card">
+                <div class="card-header">
+                    <i class="fas fa-list me-2"></i>Позиции заказа
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table items-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>№</th>
+                                    <th>Наименование</th>
+                                    <th>Тип</th>
+                                    <th>Кол-во</th>
+                                    <th>Цена</th>
+                                    <th class="text-end">Сумма</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in order.order_items.all %}
+                                <tr>
+                                    <td>{{ forloop.counter }}</td>
+                                    <td>
+                                        <strong>{{ item.product.name }}</strong>
+                                    </td>
+                                    <td>
+                                        {% if item.product.product_type == 'part' %}
+                                            <span class="badge bg-primary">Запчасть</span>
+                                        {% else %}
+                                            <span class="badge bg-success">Услуга</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ item.quantity }}</td>
+                                    <td>{{ item.unit_price|floatformat:2 }} ₽</td>
+                                    <td class="text-end fw-bold">{{ item.subtotal|floatformat:2 }} ₽</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-5 text-muted">
+                                        <i class="fas fa-box-open fa-2x mb-2 d-block"></i>
+                                        Нет позиций в заказе
+                                     </td>
+                                 </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr class="total-row">
+                                    <td colspan="5" class="text-end fw-bold">Итого:</td>
+                                    <td class="text-end fw-bold text-primary fs-5">
+                                        {{ order.total_amount|floatformat:2 }} ₽
+                                     </td>
+                                 </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Дополнительная информация (если есть) -->
+            {% if order.comment %}
+            <div class="detail-card">
+                <div class="card-header">
+                    <i class="fas fa-comment me-2"></i>Примечание к заказу
+                </div>
+                <div class="card-body">
+                    {{ order.comment|linebreaks }}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Кнопки действий -->
+            <div class="action-buttons mt-3 no-print">
+                <a href="{% url 'orders' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left me-1"></i>Назад к списку
+                </a>
+                <button onclick="window.print();" class="btn btn-info text-white">
+                    <i class="fas fa-print me-1"></i>Печать
+                </button>
+                {% if order.debt > 0 and order.status != 'issued' %}
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#paymentModal">
+                    <i class="fa-solid fa-cash-register me-1"></i>Внести платеж
+                </button>
+                {% endif %}
+                {% if order.status != 'issued' %}
+                <a href="{% url 'edit_order' order.id %}" class="btn btn-warning text-white">
+                    <i class="fas fa-edit me-1"></i>Редактировать
+                </a>
+                <a href="{% url 'cancel_order_update' order.id %}" class="btn btn-danger"
+                   onclick="return confirm('Отменить заказ №{{ order.id }}? Запчасти будут возвращены на склад.')">
+                    <i class="fas fa-times me-1"></i>Отменить
+                </a>
+                {% endif %}
+                {% if order.status == 'accepted' %}
+                <button type="button" class="btn btn-warning text_white"
+                        onclick="window.location.href='{% url 'change_order_status' order.id %}?status=in_work'"
+                        title="В работу">
+                    <i class="fa-solid fa-screwdriver-wrench"></i> В работу
+                </button>
+                {% elif order.status == 'in_work' or order.status == 'waiting_spareparts' %}
+                <button type="button" class="btn btn-success"
+                        onclick="window.location.href='{% url 'change_order_status' order.id %}?status=ready'"
+                        title="Готов">
+                    <i class="fas fa-check me-1"></i> Готов
+                </button>
+                {% elif order.status == 'ready' %}
+                <button type="button" class="btn btn-primary"
+                        onclick="window.location.href='{% url 'change_order_status' order.id %}?status=issued'"
+                        title="Завершить">
+                    <i class="fa-solid fa-box"></i> Завершить
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модалка для добавления оплаты -->
+<div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="paymentModalLabel">
+                    <i class="fas fa-credit-card me-2 text-primary"></i>
+                    Принять оплату заказа #{{ order.id }}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" id="paymentForm" action="{% url 'order_add_payment' order.id %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="alert alert-info d-flex justify-content-between mb-3">
+                        <span>Сумма заказа:</span>
+                        <strong>{{ order.total_amount|floatformat:2 }} ₽</strong>
+                    </div>
+                    <div class="alert alert-warning d-flex justify-content-between mb-3">
+                        <span>Остаток к оплате:</span>
+                        <strong class="text-danger" id="debtAmount">{{ order.debt|floatformat:2 }} ₽</strong>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="amount" class="form-label">Сумма оплаты <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <input type="number" name="amount" id="amount" class="form-control"
+                                   step="0.01" min="0.01" max="{{ order.debt }}" required>
+                            <span class="input-group-text">₽</span>
+                        </div>
+                        <div class="form-text">Максимальная сумма: {{ order.debt|floatformat:2 }} ₽</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="payment_method" class="form-label">Способ оплаты <span class="text-danger">*</span></label>
+                        <select name="payment_method" id="payment_method" class="form-select" required>
+                            <option value="">Выберите способ...</option>
+                            <option value="cash">Наличные</option>
+                            <option value="transfer">Банковский перевод</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="comment" class="form-label">Комментарий</label>
+                        <input type="text" name="comment" id="comment" class="form-control"
+                               placeholder="Например: предоплата 50%">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>Отмена
+                    </button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-check me-1"></i>Внести платеж
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+
+const uploadTrigger = document.getElementById('uploadTrigger');
+const photoInput = document.getElementById('photoInput');
+const previewArea = document.getElementById('previewArea');
+const imagePreview = document.getElementById('imagePreview');
+const previewFileName = document.getElementById('previewFileName');
+const cancelPreviewBtn = document.getElementById('cancelPreviewBtn');
+const confirmUploadBtn = document.getElementById('confirmUploadBtn');
+const photoDescription = document.getElementById('photoDescription');
+const pendingPhoto = document.getElementById('pendingPhoto');
+
+let selectedFile = null;
+
+// Клик по области загрузки
+uploadTrigger.addEventListener('click', function() {
+    photoInput.click();
+});
+
+// Выбор файла
+photoInput.addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        selectedFile = file;
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            imagePreview.src = event.target.result;
+            previewFileName.textContent = file.name.length > 30 ? file.name.substring(0, 27) + '...' : file.name;
+            previewArea.style.display = 'block';
+            photoDescription.style.display = 'block';
+            confirmUploadBtn.style.display = 'block';
+            uploadTrigger.style.display = 'none';
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+// Отмена предпросмотра
+cancelPreviewBtn.addEventListener('click', function() {
+    resetUploadForm();
+});
+
+// Подтверждение загрузки
+confirmUploadBtn.addEventListener('click', function() {
+    if (!selectedFile) return;
+
+    const formData = new FormData();
+    formData.append('image', selectedFile);
+    formData.append('description', photoDescription.value);
+    formData.append('order_id', '{{ order.id }}');
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+
+    fetch("{% url 'upload_transport_photo' order.transport.id %}", {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Перезагружаем только галерею
+            location.reload();
+        } else {
+            alert(data.error || 'Ошибка при загрузке');
+            resetUploadForm();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Ошибка при загрузке фото');
+        resetUploadForm();
+    });
+});
+
+function resetUploadForm() {
+    selectedFile = null;
+    photoInput.value = '';
+    previewArea.style.display = 'none';
+    photoDescription.style.display = 'none';
+    confirmUploadBtn.style.display = 'none';
+    uploadTrigger.style.display = 'block';
+    photoDescription.value = '';
+    pendingPhoto.value = '';
+}
+function showImageModal(src, description) {
+    document.getElementById('modalImage').src = src;
+    document.getElementById('modalDescription').textContent = description;
+    new bootstrap.Modal(document.getElementById('imageModal')).show();
+}
+document.addEventListener('DOMContentLoaded', function() {
+    const paymentForm = document.getElementById('paymentForm');
+    const amountInput = document.getElementById('amount');
+    const debtSpan = document.getElementById('debtAmount');
+    const paymentMethodSelect = document.getElementById('payment_method');
+
+    if (paymentForm) {
+        paymentForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const amount = parseFloat(amountInput.value);
+            const debt = parseFloat(debtSpan.innerText.replace('₽', '').trim());
+            const paymentMethod = paymentMethodSelect.value;
+
+            if (!amount || amount <= 0) {
+                alert('Введите корректную сумму');
+                return;
+            }
+
+            if (amount > debt) {
+                alert(`Сумма платежа (${amount.toFixed(2)} ₽) превышает долг (${debt.toFixed(2)} ₽)`);
+                return;
+            }
+
+            if (!paymentMethod) {
+                alert('Выберите способ оплаты');
+                return;
+            }
+
+            fetch(paymentForm.action, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    amount: amount,
+                    payment_method: paymentMethod,
+                    comment: document.getElementById('comment').value
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert(data.error || 'Ошибка при добавлении платежа');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Произошла ошибка при добавлении платежа');
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

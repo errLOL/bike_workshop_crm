@@ -1,0 +1,132 @@
+{% extends "inventorymanager/layout.html" %}
+
+{% block body %}
+
+<script>
+    function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+                }
+    
+    function submitHandler(id){
+            const name = document.getElementById(`name_${id}`).value;
+            const contact_name = document.getElementById(`contact_name_${id}`).value;
+            const email = document.getElementById(`contact_email_${id}`).value;
+            const phone = document.getElementById(`contact_phone_${id}`).value;
+            // const modal = document.getElementById(`modal_edit_supplier_${id}`);
+
+            fetch(`/edit_supplier/${id}`,{
+                method: "POST",
+                headers: {
+                    "Content-type":"application/json",
+                    "X-CSRFToken": getCookie("csrftoken"), // Include CSRF token for security
+                },
+                body: JSON.stringify(
+                    {
+                        name: name,
+                        contact_name: contact_name,
+                        contact_email: email,
+                        contact_phone: phone,
+                    }
+                )
+            })
+            .then(response => response.json())
+            .then(result => {
+                document.getElementById(`name_h2${id}`).innerHTML = result.name;
+                document.getElementById(`contact_name_p${id}`).innerHTML = `<strong>Contact Name:</strong> ${result.contact_name}`;
+                document.getElementById(`contact_email_p${id}`).innerHTML = `<strong>Contact Email:</strong> ${result.contact_email}`;
+                document.getElementById(`contact_phone_p${id}`).innerHTML = `<strong>Contact Phone:</strong> ${result.contact_phone}`;
+
+            })
+            .catch(error => console.error('Error:', error));
+    }
+
+</script>
+
+<div class="card shadow mt-4">
+    <div class="card-header py-3">
+        <h2 id="name_h2{{ supplier.id }}" class="m-0 font-weight-bold text-primary">{{ supplier.name }}</h2>
+    </div>
+    <div class="card-body">
+            <p id="contact_name_p{{ supplier.id }}"><strong>Contact Name:</strong> {{ supplier.contact_name }}</p>
+            <p id="contact_email_p{{ supplier.id }}"><strong>Contact Email:</strong> {{ supplier.contact_email }}</p>
+            <p id="contact_phone_p{{ supplier.id }}"><strong>Contact Phone:</strong> {{ supplier.contact_phone }}</p>
+    </div>
+</div>
+
+
+<div class="d-flex">
+    <div class="mt-2 flex-grow-1">
+        <a type="button" class="btn btn-secondary" href="{% url 'suppliers' %}">Go back</a>
+    </div>
+    <div class="mt-2 me-2">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal_edit_supplier_{{ supplier.id }}">Edit supplier</button>
+    </div>
+  <div class="mt-2">
+      <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">Delete supplier</button>
+  </div>
+</div>
+
+
+<!-- Edit Modal -->
+<div class="modal fade" id="modal_edit_supplier_{{ supplier.id }}" tabindex="-1" aria-labelledby="modal_edit_supplier_{{ supplier.id }}Label" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fs-5" id="modal_edit_supplier_{{ supplier.id }}Label">Edit Supplier</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Form group for Name -->
+                <div class="form-group">
+                    <label for="name_{{ supplier.id }}">Name</label>
+                    <input type="text" id="name_{{ supplier.id }}" class="form-control" value="{{ supplier.name }}">
+                </div>
+                <!-- Form group for Contact Name -->
+                <div class="form-group">
+                    <label for="contact_name_{{ supplier.id }}">Contact name</label>
+                    <input type="text" id="contact_name_{{ supplier.id }}" class="form-control" value="{{ supplier.contact_name }}">
+                </div>
+
+                <!-- Form group for Contact Email -->
+                <div class="form-group">
+                    <label for="contact_email_{{ supplier.id }}">Contact Email</label>
+                    <input type="text" id="contact_email_{{ supplier.id }}" class="form-control" value="{{ supplier.contact_email }}">
+                </div>
+
+                <!-- Form group for Contact Phone -->
+                <div class="form-group">
+                    <label for="contact_phone_{{ supplier.id }}">Contact Phone</label>
+                    <input type="text" id="contact_phone_{{ supplier.id }}" class="form-control" value="{{ supplier.contact_phone }}">
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="submitHandler({{ supplier.id }})" data-bs-dismiss="modal">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h1 class="modal-title fs-5" id="deleteModalLabel">Delete Supplier</h1>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          Are you sure you want to delete this supplier?
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-danger" data-bs-dismiss="modal" onclick="location.href='{% url 'delete_supplier' supplier.id %}'">Delete supplier</button>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock body %}
