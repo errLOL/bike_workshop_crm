@@ -56,8 +56,8 @@ class Product(BaseModel):
     description = models.CharField(max_length=75, blank=True)
     unit_cost = models.FloatField(null = False)
     quantity_in_stock = models.IntegerField(null=False)
-    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="products", default="uncategorized")
-    supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE, related_name="products", default='unknown')
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="products", default="Без категории")
+    supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE, related_name="products", null=True, blank=True)
 
     def __str__(self):
         return f'{self.name}'
@@ -65,7 +65,7 @@ class Product(BaseModel):
 
 class Transport(BaseModel):
     TRANSPORT_TYPES = [
-        ('scooter', 'Самокат'),
+        ('scooter', 'Электроамокат'),
         ('ebike', 'Электровелосипед'),
         ('bicycle', 'Велосипед'),
         ('monowheel', 'Моноколесо'),
@@ -106,10 +106,10 @@ class Transport(BaseModel):
 
 class Order(BaseModel):
     STATUS_CHOICES = [
-        ('accepted', 'Принял'),
+        ('accepted', 'Принят'),
         ('in_work', 'В работе'),
         ('waiting_spareparts', 'Ожидает запчасти'),
-        ('ready', 'Готов'),
+        ('ready', 'Готов к выдаче'),
         ('issued', 'Выдан'),
     ]
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name="orders")
@@ -166,7 +166,6 @@ class Order(BaseModel):
                 comment=comment,
             )
 
-            # 2. Создаём кассовую операцию
             CashTransaction.objects.create(
                 order_payment=payment,
                 order=self,

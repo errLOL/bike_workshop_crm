@@ -6,7 +6,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
         <meta name="description" content="" />
         <meta name="author" content="" />
-        <title>Inventory Manager</title>
+        <title>Spica Bike</title>
         <link href="static/inventorymanager/css/styles.css" rel="stylesheet" />
         <script src="https://use.fontawesome.com/releases/v6.3.0/js/all.js" crossorigin="anonymous"></script>
     </head>
@@ -19,7 +19,7 @@
                         <div class="row justify-content-center">
                             <div class="col-lg-5">
                                 <div class="card shadow-lg border-0 rounded-lg mt-5">
-                                    <div class="card-header"><h3 class="text-center font-weight-light my-4">Login</h3></div>
+                                    <div class="card-header"><h3 class="text-center font-weight-light my-4">Вход</h3></div>
                                     <div class="card-body">
                                         <form action="{% url 'login' %}" method="post">
                                             {% csrf_token %}
@@ -29,10 +29,10 @@
                                             </div>
                                             <div class="form-floating mb-3">
                                                 <input class="form-control" id="inputPassword" type="password" name="password" placeholder="Password" />
-                                                <label for="inputPassword">Password</label>
+                                                <label for="inputPassword">Пароль</label>
                                             </div>
                                             <div class="d-flex justify-content-center mt-4 mb-0"">
-                                                <input class="btn btn-primary" type="submit" value="Login">
+                                                <input class="btn btn-primary" type="submit" value="Войти">
                                             </div>
                                         </form>
                                     </div>
@@ -42,7 +42,7 @@
                                         {% endif %}
                                         <div class="small">
                                             
-                                            <p class="small">Contact your administrator if you forgot your password</p>
+                                            <p class="small">Свяжитесь с администратором, если забыли пароль</p>
                                         </div>
                                     </div>
         
@@ -57,12 +57,12 @@
                 <footer class="py-4 bg-light mt-auto">
                     <div class="container-fluid px-4">
                         <div class="d-flex align-items-center justify-content-between small">
-                            <div class="text-muted">Copyright &copy; Inventory Manager 2024</div>
-                            <div>
-                                <a href="#">Privacy Policy</a>
-                                &middot;
-                                <a href="#">Terms &amp; Conditions</a>
-                            </div>
+                            <div class="text-muted">Copyright &copy; Spica Bike 2026</div>
+<!--                            <div>-->
+<!--                                <a href="#">Privacy Policy</a>-->
+<!--                                &middot;-->
+<!--                                <a href="#">Terms &amp; Conditions</a>-->
+<!--                            </div>-->
                         </div>
                     </div>
                 </footer>

@@ -94,12 +94,14 @@ class ProductForm(forms.ModelForm):
         super(ProductForm, self).__init__(*args, **kwargs)
         self.fields['category'].required = False
         self.fields['supplier'].required = False
+        self.fields['description'].required = False
 
 class OrderForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_tag = False
+        # self.fields['status'].required = False
         # Если есть поле employee, добавляем его в layout
         # self.helper.layout = Layout(
             # Field('employee', wrapper_class='mb-3'),
@@ -108,8 +110,8 @@ class OrderForm(forms.ModelForm):
 
     class Meta:
         model = Order
-        fields = ['status']
-        labels = {'status': 'Статус'}
+        fields = []
+        # labels = {'status': 'Статус'}
 
 
 class OrderItemForm(forms.ModelForm):
@@ -150,14 +152,14 @@ class OrderItemForm(forms.ModelForm):
         if not quantity or quantity < 0:
             raise forms.ValidationError('Quantity must be greater than or equal to zero')
 
-        if product and product.product_type == 'part':
-            current_quantity = self.instance.quantity if self.instance.pk else 0
-            available = product.quantity_in_stock + current_quantity
-
-            if quantity > available:
-                raise forms.ValidationError(
-                    f'Недостаточно {product.name} на складе. Доступно: {available} шт.'
-                )
+        # if product and product.product_type == 'part':
+        #     current_quantity = self.instance.quantity if self.instance.pk else 0
+        #     available = product.quantity_in_stock + current_quantity
+        #
+        #     if quantity > available:
+        #         raise forms.ValidationError(
+        #             f'Недостаточно {product.name} на складе. Доступно: {available} шт.'
+        #         )
 
         return quantity
 

@@ -2,16 +2,6 @@
 {% load crispy_forms_tags %}
 {% block title %}Заказ №{{ order.id }} - Мастерская{% endblock %}
 
-{% if messages %}
-    <div class="alert alert-success alert-dismissible fade show mt-2" role="alert">
-        {% for message in messages %}
-            {{ message }}
-        {% endfor %}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-{% endif %}
-
-
 {% block extra_css %}
 <style>
     .detail-card {
@@ -100,9 +90,42 @@
     .photo-item:hover {
         transform: scale(1.02);
     }
+    .dropdown-toggle .badge {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
+
+    .btn-group .dropdown-toggle {
+        min-width: 180px;
+        text-align: left;
+    }
+
+    .dropdown-toggle::after {
+        float: right;
+        margin-top: 8px;
+    }
 </style>
 {% endblock %}
 {% block body %}
+<div class="messages">
+    {% if messages %}
+        {% for message in messages %}
+            <!-- Error Messages -->
+            {% if message.level == DEFAULT_MESSAGE_LEVELS.ERROR %}
+                <div class="alert alert-danger alert-dismissible fade show mt-2" role="alert">
+                    <strong>{{ message }}</strong>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            <!-- Success Messages -->
+            {% elif message.level == DEFAULT_MESSAGE_LEVELS.SUCCESS %}
+                <div class="alert alert-success alert-dismissible fade show mt-2" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+</div>
 <div class="container-fluid py-4">
     <nav aria-label="breadcrumb" class="mb-4 no-print">
         <ol class="breadcrumb">
@@ -447,33 +470,71 @@
                     <i class="fa-solid fa-cash-register me-1"></i>Внести платеж
                 </button>
                 {% endif %}
-                {% if order.status != 'issued' %}
-                <a href="{% url 'edit_order' order.id %}" class="btn btn-warning text-white">
-                    <i class="fas fa-edit me-1"></i>Редактировать
-                </a>
-                <a href="{% url 'cancel_order_update' order.id %}" class="btn btn-danger"
-                   onclick="return confirm('Отменить заказ №{{ order.id }}? Запчасти будут возвращены на склад.')">
-                    <i class="fas fa-times me-1"></i>Отменить
-                </a>
-                {% endif %}
-                {% if order.status == 'accepted' %}
-                <button type="button" class="btn btn-warning text_white"
-                        onclick="window.location.href='{% url 'change_order_status' order.id %}?status=in_work'"
-                        title="В работу">
-                    <i class="fa-solid fa-screwdriver-wrench"></i> В работу
+                {% if order.status == 'accepted' or order.status == 'waiting_spareparts' %}
+                <button type="button" class="btn btn-warning"
+                        onclick="window.location.href='{% url 'change_order_status' order.id %}?status=in_work'">
+                    <i class="fa-solid fa-screwdriver-wrench me-1"></i>В работу
                 </button>
-                {% elif order.status == 'in_work' or order.status == 'waiting_spareparts' %}
+                {% elif order.status == 'in_work' %}
                 <button type="button" class="btn btn-success"
-                        onclick="window.location.href='{% url 'change_order_status' order.id %}?status=ready'"
-                        title="Готов">
-                    <i class="fas fa-check me-1"></i> Готов
+                        onclick="window.location.href='{% url 'change_order_status' order.id %}?status=ready'">
+                    <i class="fas fa-check me-1"></i>Готов
                 </button>
                 {% elif order.status == 'ready' %}
                 <button type="button" class="btn btn-primary"
-                        onclick="window.location.href='{% url 'change_order_status' order.id %}?status=issued'"
-                        title="Завершить">
-                    <i class="fa-solid fa-box"></i> Завершить
+                        onclick="window.location.href='{% url 'change_order_status' order.id %}?status=issued'">
+                    <i class="fa-solid fa-box me-1"></i>Завершить
                 </button>
+                {% endif %}
+
+                <!-- Дополнительная кнопка с выпадашкой (все статусы) -->
+                {% if order.status != 'issued' %}
+                <div class="btn-group">
+                    <button type="button" class="btn btn-outline-secondary dropdown-toggle"
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="fas fa-chevron-down me-1"></i>Сменить статус
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li>
+                            <a class="dropdown-item {% if order.status == 'accepted' %}disabled{% endif %}"
+                               href="{% url 'change_order_status' order.id %}?status=accepted">
+                                <i class="fas fa-inbox me-2"></i>Принят
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item {% if order.status == 'in_work' %}disabled{% endif %}"
+                               href="{% url 'change_order_status' order.id %}?status=in_work">
+                                <i class="fas fa-tools me-2"></i>В работу
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item {% if order.status == 'waiting_spareparts' %}disabled{% endif %}"
+                               href="{% url 'change_order_status' order.id %}?status=waiting_spareparts">
+                                <i class="fas fa-clock me-2"></i>Ожидает запчасти
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item {% if order.status == 'ready' %}disabled{% endif %}"
+                               href="{% url 'change_order_status' order.id %}?status=ready">
+                                <i class="fas fa-check-circle me-2"></i>Готов
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item {% if order.status == 'issued' %}disabled{% endif %}"
+                               href="{% url 'change_order_status' order.id %}?status=issued">
+                                <i class="fas fa-hand-peace me-2"></i>Выдан
+                            </a>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <a class="dropdown-item text-danger"
+                               href="{% url 'cancel_order_update' order.id %}"
+                               onclick="return confirm('Отменить заказ №{{ order.id }}? Запчасти будут возвращены на склад.')">
+                                <i class="fas fa-times-circle me-2"></i>Отменить заказ
+                            </a>
+                        </li>
+                    </ul>
+                </div>
                 {% endif %}
             </div>
         </div>

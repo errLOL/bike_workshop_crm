@@ -969,7 +969,32 @@ def product_view(request):
     products = Product.objects.select_related("supplier", "category").annotate(
         total_value=Sum(F("quantity_in_stock") * F("unit_cost"))
     )
+    search_query = request.GET.get('search', '')
+    if search_query:
+        products = products.filter(
+            Q(name__icontains=search_query) |
+            Q(category__name__icontains=search_query) |
+            Q(supplier__name__icontains=search_query) |
+            Q(description__icontains=search_query)
+        )
 
+    # Фильтр по типу (запчасть/услуга)
+    product_type_filter = request.GET.get('product_type', '')
+    if product_type_filter:
+        products = products.filter(product_type=product_type_filter)
+
+    # Фильтр по категории
+    category_filter = request.GET.get('category', '')
+    if category_filter:
+        products = products.filter(category_id=category_filter)
+
+    # Пагинация
+    paginator = Paginator(products, 15)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    # Список категорий для фильтра
+    categories = Category.objects.all().order_by('name')
     # low_stock = Product.objects.filter(quantity_in_stock__lte=3)
 
     # if low_stock.count() > 0:
@@ -978,7 +1003,7 @@ def product_view(request):
     #     else:
     #         messages.error(request, f"{low_stock.count()} item has low stock")
 
-    low_stock_count = Product.objects.filter(quantity_in_stock__lte=3).count()
+    low_stock_count = Product.objects.filter(quantity_in_stock__lte=1, product_type='part').count()
 
     if low_stock_count > 0:
         if low_stock_count > 1:
@@ -986,12 +1011,19 @@ def product_view(request):
         else:
             messages.error(request, f"{low_stock_count} товар заканчивают на складе")
 
+    context = {
+        'products': page_obj,
+        'page_obj': page_obj,
+        'is_paginated': page_obj.has_other_pages(),
+        'search_query': search_query,
+        'product_type_filter': product_type_filter,
+        'category_filter': category_filter,
+        'categories': categories,
+    }
     return render(
         request,
         "inventorymanager/products.html",
-        {
-            "products": products,
-        },
+        context,
     )
 
 
@@ -1128,9 +1160,9 @@ def create_order(request):
                         product = item_form.cleaned_data['product']
                         quantity = item_form.cleaned_data['quantity']
 
-                        if product.product_type == 'part' and product.quantity_in_stock < quantity:
-                            messages.error(request, f'Недостаточно {product.name} на складе!')
-                            raise transaction.rollback()
+                        # if product.product_type == 'part' and product.quantity_in_stock < quantity:
+                        #     messages.error(request, f'Недостаточно {product.name} на складе!')
+                        #     raise transaction.rollback()
 
                         OrderItem.objects.create(
                             order=order,
@@ -1139,9 +1171,9 @@ def create_order(request):
                             unit_price=product.unit_cost
                         )
 
-                        if product.product_type == 'part':
-                            product.quantity_in_stock -= quantity
-                            product.save()
+                        # if product.product_type == 'part':
+                        #     product.quantity_in_stock -= quantity
+                        #     product.save()
 
                 messages.success(request, f'Заказ #{order.id} успешно создан!')
                 return redirect('order_detail', order_id=order.id)
@@ -1344,59 +1376,44 @@ def edit_order(request, order):
     products = Product.objects.all().order_by('product_type', 'name')
 
     if request.method == 'POST':
-
-        # 🔹 Старые позиции
-        old_items = {
-            item.product_id: item.quantity
-            for item in order.order_items.select_related('product').all()
-            if item.product.product_type == 'part'
-        }
-
+        if order.status in ('in_work', 'ready'):
+            old_items = {
+                item.product_id: item.quantity
+                for item in order.order_items.select_related('product').all()
+                if item.product.product_type == 'part'
+            }
         form = OrderForm(request.POST, instance=order)
         formset = OrderItemFormSet(request.POST, instance=order)
+
         if form.is_valid() and formset.is_valid():
-            try:
-                with transaction.atomic():
+            with transaction.atomic():
+                # 1. Сохраняем заказ
+                order = form.save(commit=False)
+                customer_id = request.POST.get('customer')
+                transport_id = request.POST.get('transport')
+                if customer_id:
+                    order.customer_id = customer_id
+                if transport_id:
+                    order.transport_id = transport_id
+                order.save()
 
-                    # =========================
-                    # 1. Сохраняем заказ
-                    # =========================
-                    order = form.save(commit=False)
+                formset.instance = order
+                formset.save()
 
-                    customer_id = request.POST.get('customer')
-                    transport_id = request.POST.get('transport')
-
-                    if customer_id:
-                        order.customer_id = customer_id
-                    if transport_id:
-                        order.transport_id = transport_id
-
-                    order.save()
-
-                    # =========================
-                    # 2. Сохраняем позиции
-                    # =========================
-                    formset.instance = order
-                    formset.save()
-
-                    # =========================
-                    # 3. Новые позиции
-                    # =========================
+                if order.status in ('in_work', 'ready'):
+                    # Используем логику DIFF для корректировки склада
                     new_items = {
                         item.product_id: item.quantity
                         for item in order.order_items.select_related('product').all()
                         if item.product.product_type == 'part'
                     }
 
-                    # =========================
-                    # 4. DIFF логика
-                    # =========================
                     all_ids = set(old_items.keys()) | set(new_items.keys())
-
                     for product_id in all_ids:
                         old_qty = old_items.get(product_id, 0)
                         new_qty = new_items.get(product_id, 0)
                         diff = new_qty - old_qty
+                        print(old_qty, new_qty, diff)
 
                         if diff == 0:
                             continue
@@ -1406,10 +1423,11 @@ def edit_order(request, order):
                         if diff > 0:
                             # ➖ списание
                             if product.quantity_in_stock < diff:
-                                raise ValidationError(
+                                messages.error(request,
                                     f'Недостаточно "{product.name}". '
                                     f'Доступно: {product.quantity_in_stock}, нужно: {diff}'
                                 )
+                                return redirect('order_detail', order_id=order.id)
                             product.quantity_in_stock = F('quantity_in_stock') - diff
                         else:
                             # ➕ возврат
@@ -1419,10 +1437,6 @@ def edit_order(request, order):
 
                     messages.success(request, f'Заказ #{order.id} обновлён')
                     return redirect('order_detail', order_id=order.id)
-
-            except ValidationError as e:
-                form.add_error(None, e)
-
     else:
         form = OrderForm(instance=order)
         formset = OrderItemFormSet(instance=order)
@@ -1463,8 +1477,36 @@ def change_order_status(request, order_id):
     valid_statuses = [choice[0] for choice in Order.STATUS_CHOICES]
 
     if status not in valid_statuses or order.status == status:
-        messages.warning(f"Недопустимый статус заказа.")
+        messages.warning(request, f"Недопустимый статус заказа.")
         return redirect('orders')
+
+    if status == 'in_work'  and order.status in ('accepted', 'waiting_spareparts'):
+        with transaction.atomic():
+            missing_parts = []
+            for item in order.order_items.all():
+                if item.product.product_type == 'part':
+                    if item.product.quantity_in_stock >= item.quantity:
+                        item.product.quantity_in_stock -= item.quantity
+                        item.product.save()
+                    else:
+                        missing_parts.append({
+                            'name': item.product.name,
+                            'available': item.product.quantity_in_stock,
+                            'required': item.quantity
+                        })
+
+            if missing_parts:
+                for part in missing_parts:
+                    messages.error(request, f'Недостаточно "{part["name"]}" на складе. Доступно: {part["available"]}, требуется: {part["required"]}')
+                return redirect('order_detail', order_id=order.id)
+
+    if order.status in ('in_work', 'ready') and status in ('accepted', 'waiting_spareparts'):
+        for item in order.order_items.all():
+            if item.product.product_type == 'part':
+                item.product.quantity_in_stock += item.quantity
+                item.product.save()
+        messages.info(request, 'Запчасти возвращены на склад')
+
     order.status = status
     order.save()
     messages.success(request, f'Заказ #{order.id} отмечен как "{order.get_status_display()}"')

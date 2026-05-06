@@ -264,6 +264,14 @@
         .btn-sm {
             padding: 0.2rem 0.4rem;
         }
+
+        .select2-dropdown {
+            width: 340px !important;
+        }
+
+        .select2-container {
+            width: 100% !important;
+        }
     }
 </style>
 {% endblock %}
@@ -444,11 +452,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const selectEl = row.querySelector('.product-select');
         if (!selectEl) return;
         if ($(selectEl).data('select2')) $(selectEl).select2('destroy');
-
+        const isMobile = window.innerWidth <= 768;
         $(selectEl).select2({
             theme: 'bootstrap-5',
             width: '100%',
-            dropdownParent: row.closest('form'),
+            dropdownParent: isMobile ? $('body') : row.closest('form'),
             templateResult: formatProductOption,
             templateSelection: formatSelectedOption
         });
@@ -570,7 +578,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function initCustomerSelect2() {
         let customerData = customersData.map(c => ({
             id: c.id,
-            text: c.phone ? `${c.name} (${c.phone})` : c.name
+            text: c.phone ? `${c.name} (${c.phone})` : `${c.name} (${c.telegram})`
         }));
         $customer.append(new Option('', '', true, true));
         $customer.select2({
@@ -614,7 +622,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!customer) return;
 
         const filtered = transportsData.filter(
-            t => t.customer_name === customer.name
+            t => t.customer_id === customer.id
         );
 
         $transport.empty();

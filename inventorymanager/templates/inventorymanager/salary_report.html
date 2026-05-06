@@ -182,7 +182,7 @@
                     </thead>
                     <tbody>
                         {% for item in salary_data %}
-                        <td>
+                        <tr>
                             <td>{{ forloop.counter }}</a></td>
                             <td>
                                 <strong>{{ item.user.get_full_name|default:item.user.username }}</strong>
