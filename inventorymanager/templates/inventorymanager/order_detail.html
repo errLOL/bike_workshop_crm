@@ -465,6 +465,11 @@
                 <button onclick="window.print();" class="btn btn-info text-white">
                     <i class="fas fa-print me-1"></i>Печать
                 </button>
+                {% if order.status != 'issued' %}
+                <a href="{% url 'edit_order' order.id %}" class="btn btn-warning text-white">
+                    <i class="fas fa-edit me-1"></i>Редактировать
+                </a>
+                {% endif %}
                 {% if order.debt > 0 and order.status != 'issued' %}
                 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#paymentModal">
                     <i class="fa-solid fa-cash-register me-1"></i>Внести платеж
