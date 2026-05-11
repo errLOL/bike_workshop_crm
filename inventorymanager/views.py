@@ -32,7 +32,7 @@ def admin_dashboard(request):
     }
 
     if request.user.is_authenticated:
-        low_stock = Product.objects.filter(quantity_in_stock__lte=3)
+        low_stock = Product.objects.filter(quantity_in_stock__lte=1, product_type='part')
 
         orders_total = OrderItem.objects.annotate(
             total_price=F("quantity") * F("unit_price")
@@ -1376,67 +1376,123 @@ def edit_order(request, order):
     products = Product.objects.all().order_by('product_type', 'name')
 
     if request.method == 'POST':
+        old_items = {}
         if order.status in ('in_work', 'ready'):
             old_items = {
                 item.product_id: item.quantity
                 for item in order.order_items.select_related('product').all()
                 if item.product.product_type == 'part'
             }
+
         form = OrderForm(request.POST, instance=order)
         formset = OrderItemFormSet(request.POST, instance=order)
 
         if form.is_valid() and formset.is_valid():
-            with transaction.atomic():
-                # 1. Сохраняем заказ
-                order = form.save(commit=False)
-                customer_id = request.POST.get('customer')
-                transport_id = request.POST.get('transport')
-                if customer_id:
-                    order.customer_id = customer_id
-                if transport_id:
-                    order.transport_id = transport_id
-                order.save()
+            try:
+                with transaction.atomic():
+                    if order.status in ('in_work', 'ready'):
 
-                formset.instance = order
-                formset.save()
+                        new_items = {}
 
-                if order.status in ('in_work', 'ready'):
-                    # Используем логику DIFF для корректировки склада
-                    new_items = {
-                        item.product_id: item.quantity
-                        for item in order.order_items.select_related('product').all()
-                        if item.product.product_type == 'part'
-                    }
+                        for form_item in formset.forms:
 
-                    all_ids = set(old_items.keys()) | set(new_items.keys())
-                    for product_id in all_ids:
-                        old_qty = old_items.get(product_id, 0)
-                        new_qty = new_items.get(product_id, 0)
-                        diff = new_qty - old_qty
-                        print(old_qty, new_qty, diff)
+                            if form_item.cleaned_data.get('DELETE'):
+                                continue
 
-                        if diff == 0:
-                            continue
+                            product = form_item.cleaned_data.get('product')
+                            quantity = form_item.cleaned_data.get('quantity')
 
-                        product = Product.objects.select_for_update().get(id=product_id)
+                            if (
+                                product and
+                                quantity and
+                                product.product_type == 'part'
+                            ):
+                                new_items[product.id] = quantity
 
-                        if diff > 0:
-                            # ➖ списание
+                        all_ids = set(old_items.keys()) | set(new_items.keys())
+                        for product_id in all_ids:
+                            old_qty = old_items.get(product_id, 0)
+                            new_qty = new_items.get(product_id, 0)
+
+                            diff = new_qty - old_qty
+                            if diff <= 0:
+                                continue
+                            product = Product.objects.select_for_update().get(id=product_id)
+
                             if product.quantity_in_stock < diff:
-                                messages.error(request,
+
+                                messages.error(
+                                    request,
                                     f'Недостаточно "{product.name}". '
                                     f'Доступно: {product.quantity_in_stock}, нужно: {diff}'
                                 )
+
+                                # rollback transaction
+                                transaction.set_rollback(True)
+
                                 return redirect('order_detail', order_id=order.id)
-                            product.quantity_in_stock = F('quantity_in_stock') - diff
-                        else:
-                            # ➕ возврат
-                            product.quantity_in_stock = F('quantity_in_stock') + abs(diff)
 
-                        product.save()
+                    order = form.save(commit=False)
 
-                    messages.success(request, f'Заказ #{order.id} обновлён')
+                    customer_id = request.POST.get('customer')
+                    transport_id = request.POST.get('transport')
+
+                    if customer_id:
+                        order.customer_id = customer_id
+
+                    if transport_id:
+                        order.transport_id = transport_id
+
+                    order.save()
+
+                    formset.instance = order
+                    formset.save()
+
+                    if order.status in ('in_work', 'ready'):
+
+                        new_items = {
+                            item.product_id: item.quantity
+                            for item in order.order_items.select_related('product').all()
+                            if item.product.product_type == 'part'
+                        }
+
+                        all_ids = set(old_items.keys()) | set(new_items.keys())
+
+                        for product_id in all_ids:
+
+                            old_qty = old_items.get(product_id, 0)
+                            new_qty = new_items.get(product_id, 0)
+
+                            diff = new_qty - old_qty
+
+                            if diff == 0:
+                                continue
+
+                            product = Product.objects.select_for_update().get(id=product_id)
+
+                            if diff > 0:
+                                product.quantity_in_stock = (
+                                    F('quantity_in_stock') - diff
+                                )
+                            else:
+                                product.quantity_in_stock = (
+                                    F('quantity_in_stock') + abs(diff)
+                                )
+
+                            product.save()
+
+                    messages.success(
+                        request,
+                        f'Заказ #{order.id} обновлён'
+                    )
                     return redirect('order_detail', order_id=order.id)
+
+            except Exception as e:
+                messages.error(
+                    request,
+                    f'Ошибка при обновлении заказа: {str(e)}'
+                )
+                return redirect('order_detail', order_id=order.id)
     else:
         form = OrderForm(instance=order)
         formset = OrderItemFormSet(instance=order)

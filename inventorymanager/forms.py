@@ -133,7 +133,7 @@ class OrderItemForm(forms.ModelForm):
 
     class Meta:
         model = OrderItem
-        fields = ['product', 'quantity']
+        fields = ['product', 'quantity', 'unit_price']
         labels = {
             'product': 'Товар/услуга',
             'quantity': 'Количество',
@@ -141,8 +141,19 @@ class OrderItemForm(forms.ModelForm):
 
     def clean_unit_price(self):
         unit_price = self.cleaned_data.get('unit_price')
+        product = self.cleaned_data.get('product')
+
+        if not unit_price and product:
+            return product.unit_cost
+
+        if product and product.product_type == 'part':
+            if unit_price and unit_price != product.unit_cost:
+                raise forms.ValidationError(
+                    f'Цену на запчасть "{product.name}" изменить нельзя'
+                )
+
         if not unit_price or unit_price < 0:
-            raise forms.ValidationError('Unit price must be greater than or equal to zero')
+            raise forms.ValidationError('Цена должна быть больше и равно нулю')
         return unit_price
 
     def clean_quantity(self):
@@ -162,6 +173,22 @@ class OrderItemForm(forms.ModelForm):
         #         )
 
         return quantity
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        product = instance.product
+
+        if product.product_type == 'service' and self.cleaned_data.get('unit_price'):
+            # Для услуг — используем введённую цену
+            instance.unit_price = self.cleaned_data['unit_price']
+        else:
+            # Для запчастей — всегда из продукта
+            instance.unit_price = product.unit_cost
+
+        if commit:
+            instance.save()
+        return instance
+
 
 OrderItemFormSet = inlineformset_factory(
     Order,

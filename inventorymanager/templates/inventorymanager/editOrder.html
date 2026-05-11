@@ -126,7 +126,19 @@
                                            class="quantity-input form-control"
                                            id="{{ item_form.quantity.id_for_label }}">
                                 </td>
-                                <td class="price-display text-end fw-medium">—</td>
+                                <td class="price-display text-end fw-medium" data-price="{{ item_form.instance.unit_price }}">
+                                    {% if item_form.instance.product.product_type == 'service' %}
+                                        <input type="number"
+                                               name="order_items-{{ forloop.counter0 }}-unit_price"
+                                               value="{{ item_form.instance.unit_price|floatformat:2 }}"
+                                               step="10"
+                                               class="form-control form-control-sm price-input"
+                                               style="width: 100px; display: inline-block;">
+                                    {% else %}
+                                        <span class="part-price">{{ item_form.instance.unit_price|floatformat:2 }} ₽</span>
+                                        <input type="hidden" name="order_items-{{ forloop.counter0 }}-unit_price" value="{{ item_form.instance.unit_price }}">
+                                    {% endif %}
+                                </td>
                                 <td class="subtotal-display text-end fw-bold text-primary">—</td>
                                 <td class="text-center">
                                     {% if item_form.instance.pk %}
@@ -197,7 +209,9 @@
                    class="quantity-input form-control"
                    id="id_order_items-__prefix__-quantity">
         </td>
-        <td class="price-display text-end fw-medium">—</td>
+        <td class="price-display text-end fw-medium">
+
+        </td>
         <td class="subtotal-display text-end fw-bold text-primary">—</td>
         <td class="text-center">
             <button type="button" class="btn btn-sm btn-link text-danger remove-row" title="Удалить позицию">
@@ -391,13 +405,54 @@ document.addEventListener('DOMContentLoaded', function() {
             updateTotal();
             return;
         }
-
         const quantity = parseInt(quantityInput ? quantityInput.value : 0) || 0;
-        const price = product.price;
-        const subtotal = price * quantity;
+        let price = product.price;
 
-        priceDisplay.textContent = price.toFixed(2);
-        subtotalDisplay.textContent = subtotal.toFixed(2);
+        // Получаем индекс строки (для name атрибута)
+        const rowIndex = row.dataset.index;
+        const namePrefix = `order_items-${rowIndex}`;
+
+        // Для услуг — поле ввода с name
+        if (product.type === 'service') {
+
+            let priceInput = priceDisplay.querySelector('.price-input');
+
+            // если input ещё нет — создаём
+            if (!priceInput) {
+
+                // пытаемся взять существующее значение
+                let existingPrice =
+                    priceDisplay.querySelector('input[type="hidden"]')?.value ||
+                    priceDisplay.dataset.price ||
+                    product.price;
+
+                priceDisplay.innerHTML = `
+                    <input type="number"
+                           name="${namePrefix}-unit_price"
+                           value="${existingPrice}"
+                           step="0.01"
+                           class="form-control form-control-sm price-input"
+                           style="width: 100px;">
+                `;
+
+                priceInput = priceDisplay.querySelector('.price-input');
+
+                priceInput.addEventListener('input', function () {
+                    updateRow(row);
+                });
+            }
+
+            // берём цену из input
+            price = parseFloat(priceInput.value) || 0;
+        }
+        else {
+            // Для запчастей — скрытое поле с name
+            priceDisplay.innerHTML = `<span class="part-price">${price.toFixed(2)} ₽</span>
+                                   <input type="hidden" name="${namePrefix}-unit_price" value="${price}">`;
+        }
+
+        const subtotal = price * quantity;
+        subtotalDisplay.textContent = subtotal.toFixed(2) + ' ₽';
         typeBadge.textContent = product.type === 'part' ? 'Запчасть' : 'Услуга';
         typeBadge.className = 'badge product-type-badge ' + (product.type === 'part' ? 'bg-primary' : 'bg-success');
         updateTotal();
@@ -461,6 +516,15 @@ document.addEventListener('DOMContentLoaded', function() {
             quantity.removeEventListener('input', row._quantityHandler);
             row._quantityHandler = () => updateRow(row);
             quantity.addEventListener('input', row._quantityHandler);
+        }
+        const priceInput = row.querySelector('.price-input');
+
+        if (priceInput) {
+            priceInput.removeEventListener('input', row._priceHandler);
+
+            row._priceHandler = () => updateRow(row);
+
+            priceInput.addEventListener('input', row._priceHandler);
         }
         if (removeBtn) {
             removeBtn.removeEventListener('click', row._removeHandler);
@@ -676,7 +740,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    const orderForm = document.getElementById('order-create-form');
+    const orderForm = document.getElementById('order-edit-form');
     if (orderForm) {
         orderForm.addEventListener('submit', (e) => {
             let hasItems = false;
