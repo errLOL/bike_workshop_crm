@@ -66,6 +66,23 @@
                     </div>
                 </div>
 
+                {% if admin %}
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="employee_select" class="form-label">Техник</label>
+                        <select name="employee" id="employee_select" class="form-select">
+                            {% for tech in technicians %}
+                            <option value="{{ tech.id }}" {% if order.employee.id == tech.id %}selected{% endif %}>
+                                {{ tech.get_full_name|default:tech.username }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                {% else %}
+                    <input type="hidden" name="employee" value="{{ request.user.id }}">
+                {% endif %}
+
             </div>
         </div>
 

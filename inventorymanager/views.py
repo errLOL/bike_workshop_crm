@@ -195,8 +195,8 @@ def technician_dashboard(request):
     my_completed_orders = Order.objects.filter(
         employee=user,
         status='issued',
-        created_at__gte=week_ago
-    ).select_related('customer', 'transport').order_by('-created_at')
+        updated_at__gte=week_ago
+    ).select_related('customer', 'transport').order_by('-updated_at')
 
     # Добавляем доход техника для каждого заказа
     for order in my_completed_orders:
@@ -928,7 +928,6 @@ def create_customer(request):
             form.save()
             messages.success(request, 'Клиент успешно добавлен')
 
-            # Если есть параметр next, редиректим туда
             next_url = request.GET.get('next')
             if next_url:
                 return redirect(next_url)
@@ -948,7 +947,7 @@ def create_transport(request):
 
             next_url = request.GET.get('next')
             if next_url:
-                return redirect(next_url)
+                return redirect(next_url + f"&transport={form.instance.id}")
             return redirect('transports')
     else:
         # Предзаполнение клиента, если передан параметр
@@ -1122,17 +1121,21 @@ def create_order(request):
     products = Product.objects.all().order_by('product_type', 'name')
     customers = Customer.objects.all().order_by('name')
     transports = Transport.objects.select_related('customer').all().order_by('-created_at')
+    User = get_user_model()
+    technicians = User.objects.filter(
+        Q(is_superuser=True) | Q(groups__name='Technician')
+    ).distinct().order_by('first_name', 'username')
 
     if request.method == 'POST':
         form = OrderForm(request.POST)
         formset = OrderItemFormSet(request.POST)
         initial_customer = request.POST.get('customer')
         initial_transport = request.POST.get('transport')
-
         if form.is_valid() and formset.is_valid():
             with transaction.atomic():
                 customer_id = initial_customer
                 transport_id = initial_transport
+                employee_id = request.POST.get('employee')
                 if not customer_id or not transport_id:
                     messages.error(request, 'Выберите клиента' if not customer_id else 'Выберите технику')
                     return render(request, 'inventory/createOrder.html', {
@@ -1151,7 +1154,10 @@ def create_order(request):
                 order = form.save(commit=False)
                 order.customer = customer
                 order.transport = transport
-                order.employee = request.user
+                if employee_id:
+                    order.employee_id = employee_id
+                else:
+                    order.employee = request.user
                 order.save()
 
                 # Сохраняем позиции заказа (OrderItem)
@@ -1188,6 +1194,7 @@ def create_order(request):
         'products': products,
         'customers': customers,
         'transports': transports,
+        'technicians': technicians,
         'initial_customer': initial_customer or '',
         'initial_transport': initial_transport or '',
         'title': 'Создание заказа',
@@ -1374,7 +1381,10 @@ def edit_order(request, order):
     customers = Customer.objects.all().order_by('name')
     transports = Transport.objects.select_related('customer').all()
     products = Product.objects.all().order_by('product_type', 'name')
-
+    User = get_user_model()
+    technicians = User.objects.filter(
+        Q(is_superuser=True) | Q(groups__name='Technician')
+    ).distinct().order_by('first_name', 'username')
     if request.method == 'POST':
         old_items = {}
         if order.status in ('in_work', 'ready'):
@@ -1436,12 +1446,14 @@ def edit_order(request, order):
 
                     customer_id = request.POST.get('customer')
                     transport_id = request.POST.get('transport')
+                    employee_id = request.POST.get('employee')
 
                     if customer_id:
                         order.customer_id = customer_id
-
                     if transport_id:
                         order.transport_id = transport_id
+                    if employee_id:
+                        order.employee_id = employee_id
 
                     order.save()
 
@@ -1503,6 +1515,7 @@ def edit_order(request, order):
         'order': order,
         'customers': customers,
         'transports': transports,
+        'technicians': technicians,
         'products': products,
     })
 

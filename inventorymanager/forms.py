@@ -130,6 +130,7 @@ class OrderItemForm(forms.ModelForm):
             'class': 'quantity-input form-control',
             'value': 1
         })
+        self.fields['unit_price'].required = False
 
     class Meta:
         model = OrderItem

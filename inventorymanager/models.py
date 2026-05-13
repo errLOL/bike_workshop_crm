@@ -65,7 +65,7 @@ class Product(BaseModel):
 
 class Transport(BaseModel):
     TRANSPORT_TYPES = [
-        ('scooter', 'Электроамокат'),
+        ('scooter', 'Электросамокат'),
         ('ebike', 'Электровелосипед'),
         ('bicycle', 'Велосипед'),
         ('monowheel', 'Моноколесо'),

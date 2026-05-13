@@ -64,6 +64,22 @@
                         <div class="form-text">Выберите клиента, затем технику.</div>
                     </div>
                 </div>
+                {% if admin %}
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="employee_select" class="form-label">Техник</label>
+                            <select name="employee" id="employee_select" class="form-select">
+                                {% for tech in technicians %}
+                                <option value="{{ tech.id }}" {% if order.employee.id == tech.id %}selected{% endif %}>
+                                    {{ tech.get_full_name|default:tech.username }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                {% else %}
+                    <input type="hidden" name="employee" value="{{ request.user.id }}">
+                {% endif %}
             </div>
         </div>
 
@@ -671,9 +687,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const customerId = $customer.val();
         if (!customerId) return;
-
+        const cleanUrl = window.location.origin + window.location.pathname;
         window.location.href =
-            "{% url 'create_transport' %}" + `?customer_id=${customerId}&next=${encodeURIComponent(window.location.href)}`;
+            "{% url 'create_transport' %}" + `?customer_id=${customerId}&next=${encodeURIComponent(cleanUrl+ "?customer=" + customerId)}`;
     });
 
     initCustomerSelect2();
