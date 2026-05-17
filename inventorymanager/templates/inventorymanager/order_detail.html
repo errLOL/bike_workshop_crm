@@ -446,16 +446,16 @@
             </div>
 
             <!-- Дополнительная информация (если есть) -->
-            {% if order.comment %}
-            <div class="detail-card">
-                <div class="card-header">
-                    <i class="fas fa-comment me-2"></i>Примечание к заказу
+            {% if order.description %}
+                <div class="detail-card">
+                    <div class="card-header">
+                        <i class="fas fa-clipboard-list me-2"></i>Описание проблемы
+                    </div>
+                    <div class="card-body">
+                        {{ order.description|linebreaks }}
+                    </div>
                 </div>
-                <div class="card-body">
-                    {{ order.comment|linebreaks }}
-                </div>
-            </div>
-            {% endif %}
+                {% endif %}
 
             <!-- Кнопки действий -->
             <div class="action-buttons mt-3 no-print">

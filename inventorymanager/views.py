@@ -1158,6 +1158,7 @@ def create_order(request):
                     order.employee_id = employee_id
                 else:
                     order.employee = request.user
+                order.description = request.POST.get('description', '')
                 order.save()
 
                 # Сохраняем позиции заказа (OrderItem)
@@ -1447,7 +1448,7 @@ def edit_order(request, order):
                     customer_id = request.POST.get('customer')
                     transport_id = request.POST.get('transport')
                     employee_id = request.POST.get('employee')
-
+                    order.description = request.POST.get('description', '')
                     if customer_id:
                         order.customer_id = customer_id
                     if transport_id:

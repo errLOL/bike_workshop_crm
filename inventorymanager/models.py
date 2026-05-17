@@ -129,6 +129,12 @@ class Order(BaseModel):
         verbose_name='Транспорт'
     )
     status = models.CharField(max_length=100, choices=STATUS_CHOICES, default='accepted')
+    description = models.CharField(
+        max_length=800,
+        blank=True,
+        null=True,
+        verbose_name='Причина обращения'
+    )
 
     def total_amount(self):
         return sum(item.subtotal() for item in self.order_items.all())
