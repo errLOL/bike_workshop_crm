@@ -5,6 +5,7 @@ urlpatterns = [
     path("", views.dashboard_router, name="index"),
     path('admin-dashboard', views.admin_dashboard, name='admin_dashboard'),
     path('dashboard', views.technician_dashboard, name='technician_dashboard'),
+    path('action_logs', views.action_logs, name='action_logs'),
     path("login", views.login_view, name="login"),
     path("logout", views.logout_view, name="logout"),
     path("my_salary", views.my_salary, name="my_salary"),

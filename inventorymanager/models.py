@@ -4,7 +4,7 @@ from django.db import models, transaction
 from django.db.models import F, Sum
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-
+from django.urls import reverse
 
 class BaseModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
@@ -111,6 +111,7 @@ class Order(BaseModel):
         ('waiting_spareparts', 'Ожидает запчасти'),
         ('ready', 'Готов к выдаче'),
         ('issued', 'Выдан'),
+        ('cancelled', 'Отменен'),
     ]
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name="orders")
     employee = models.ForeignKey(
@@ -135,6 +136,7 @@ class Order(BaseModel):
         null=True,
         verbose_name='Причина обращения'
     )
+    ompleted_at = models.DateTimeField(null=True, blank=True, verbose_name='Дата завершения')
 
     def total_amount(self):
         return sum(item.subtotal() for item in self.order_items.all())
@@ -324,3 +326,39 @@ class OrderPayment(models.Model):
         ordering = ['-created_at']
         verbose_name = 'Оплата заказа'
         verbose_name_plural = 'Оплаты заказов'
+
+
+class ActionLog(BaseModel):
+    ACTION_TYPES = [
+        ('create', 'Создание'),
+        ('edit', 'Редактирование'),
+        ('delete', 'Удаление'),
+        ('status_change', 'Смена статуса'),
+        ('payment', 'Оплата'),
+        ('stock_change', 'Изменение склада'),
+        ('login', 'Вход в систему'),
+        ('logout', 'Выход'),
+    ]
+
+    user = models.ForeignKey(get_user_model(), on_delete=models.SET_NULL, null=True, verbose_name='Пользователь')
+    action_type = models.CharField(max_length=20, choices=ACTION_TYPES, verbose_name='Тип действия')
+    model_name = models.CharField(max_length=100, verbose_name='Модель')
+    object_id = models.IntegerField(null=True, blank=True, verbose_name='ID объекта')
+    object_repr = models.CharField(max_length=200, verbose_name='Объект')
+    changes = models.JSONField(default=dict, verbose_name='Изменения')
+    ip_address = models.GenericIPAddressField(null=True, blank=True, verbose_name='IP адрес')
+
+    def get_absolute_url(self):
+        """Возвращает ссылку на просмотр объекта"""
+        if self.model_name == 'Order' and self.object_id:
+            return reverse('order_detail', args=[self.object_id])
+        elif self.model_name == 'Customer' and self.object_id:
+            return reverse('customer_detail', args=[self.object_id])
+        elif self.model_name == 'Product' and self.object_id:
+            return reverse('product_detail', args=[self.object_id])
+        return '#'
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Лог действия'
+        verbose_name_plural = 'Логи действий'

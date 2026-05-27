@@ -10,6 +10,7 @@ admin.site.register(Order)
 admin.site.register(OrderItem)
 admin.site.register(CashRegister)
 admin.site.register(CashTransaction)
+admin.site.register(ActionLog)
 
 
 

@@ -21,6 +21,28 @@ import json
 
 from .utils import calculate_all_technicians_salary, calculate_technician_salary
 
+
+def log_action(request, action_type, model_name, object_id, object_repr, changes=None):
+    """Простая функция для логирования действий"""
+    ActionLog.objects.create(
+        user=request.user if request.user.is_authenticated else None,
+        action_type=action_type,
+        model_name=model_name,
+        object_id=object_id,
+        object_repr=object_repr,
+        ip_address=get_client_ip(request),
+        changes=changes or {}
+    )
+
+def get_client_ip(request):
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0]
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
+
+
 @require_admin
 def admin_dashboard(request):
     # Authenticated users view the Dashboard
@@ -113,11 +135,13 @@ def admin_dashboard(request):
         customer_orders_data = [
             float(item["total_spending"]) for item in customer_orders
         ]
+        recent_actions = ActionLog.objects.select_related('user').all()[:10]
 
         context = {
             "low_stock": low_stock.count(),
             "products_total": product_total_cost,
             "orders_total": orders_total,
+            "recent_actions": recent_actions,
             "revenue": net_revenue,
             "sales_rev_labels": (
                 json.dumps(sales_rev_labels) if sales_rev_labels else json.dumps([])
@@ -243,7 +267,6 @@ def technician_dashboard(request):
 
 @login_required
 def dashboard_router(request):
-    """Роутер для дашборда — перенаправляет на нужную версию"""
     if request.user.is_superuser or request.user.groups.filter(name='Admin').exists():
         return redirect('admin_dashboard')
     else:
@@ -253,7 +276,6 @@ def dashboard_router(request):
 def login_view(request):
     if request.method == "POST":
 
-        # Attempt to sign user in
         email = request.POST["username"]
         password = request.POST["password"]
         user = authenticate(request, username=email, password=password)
@@ -266,11 +288,10 @@ def login_view(request):
             return render(
                 request,
                 "inventorymanager/login.html",
-                {"message": "Invalid email and/or password."},
+                {"message": "Неверный логин или пароль"},
             )
     else:
         return render(request, "inventorymanager/login.html")
-
 
 def logout_view(request):
     logout(request)
@@ -1115,7 +1136,6 @@ def order_list(request):
 
     return render(request, 'inventorymanager/orders.html', context)
 
-
 @login_required
 def create_order(request):
     products = Product.objects.all().order_by('product_type', 'name')
@@ -1181,7 +1201,13 @@ def create_order(request):
                         # if product.product_type == 'part':
                         #     product.quantity_in_stock -= quantity
                         #     product.save()
-
+                log_action(
+                    request,
+                    'create',
+                    'Order',
+                    order.id,
+                    f"Заказ #{order.id}"
+                )
                 messages.success(request, f'Заказ #{order.id} успешно создан!')
                 return redirect('order_detail', order_id=order.id)
     else:
@@ -1494,6 +1520,13 @@ def edit_order(request, order):
 
                             product.save()
 
+                    log_action(
+                        request,
+                        'edit',
+                        'Order',
+                        order.id,
+                        f"Заказ #{order.id}"
+                    )
                     messages.success(
                         request,
                         f'Заказ #{order.id} обновлён'
@@ -1534,7 +1567,16 @@ def cancel_order_update(request, order):
             # Restoring current quantity in stock
             order_item.product.quantity_in_stock -= order_item.quantity
             order_item.product.save()
-        order.delete()
+        log_action(
+            request,
+            'status_change',
+            'Order',
+            order.id,
+            f"Заказ #{order.id}",
+            {'old_status': order.status, 'new_status': "cancelled"}
+        )
+        order.status = "cancelled"
+        order.save()
         messages.success(request, f'Заказ #{order.id} отменён, запчасти возвращены на склад')
     return redirect("orders")
 
@@ -1577,10 +1619,61 @@ def change_order_status(request, order_id):
                 item.product.save()
         messages.info(request, 'Запчасти возвращены на склад')
 
+    if order.status != 'issued' and status == 'issued':
+        order.completed_at = timezone.now()
+
+    log_action(
+            request,
+            'status_change',
+            'Order',
+            order.id,
+            f"Заказ #{order.id}",
+            {'old_status': order.status, 'new_status': status}
+        )
     order.status = status
     order.save()
     messages.success(request, f'Заказ #{order.id} отмечен как "{order.get_status_display()}"')
     return redirect('orders')
+
+
+@login_required
+@require_admin
+def action_logs(request):
+    logs = ActionLog.objects.select_related('user').all().order_by('-created_at')
+
+    # Фильтры
+    action_type = request.GET.get('action_type', '')
+    if action_type:
+        logs = logs.filter(action_type=action_type)
+
+    user_id = request.GET.get('user', '')
+    if user_id:
+        logs = logs.filter(user_id=user_id)
+
+    date_from = request.GET.get('date_from', '')
+    if date_from:
+        logs = logs.filter(created_at__date__gte=date_from)
+
+    date_to = request.GET.get('date_to', '')
+    if date_to:
+        logs = logs.filter(created_at__date__lte=date_to)
+
+    # Пагинация
+    paginator = Paginator(logs, 50)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'logs': page_obj,
+        'page_obj': page_obj,
+        'action_types': ActionLog.ACTION_TYPES,
+        'users': get_user_model().objects.filter(action_logs__isnull=False).distinct(),
+        'selected_action': action_type,
+        'selected_user': user_id,
+        'date_from': date_from,
+        'date_to': date_to,
+    }
+    return render(request, 'inventorymanager/action_logs.html', context)
 
 
 @require_admin
@@ -1884,7 +1977,6 @@ def api_create_transport(request):
 @login_required
 # @require_order_access
 def order_add_payment(request, order_id):
-    """AJAX-обработчик для добавления оплаты через модалку"""
     order = get_object_or_404(Order, pk=order_id)
     try:
         data = json.loads(request.body)
@@ -1892,7 +1984,6 @@ def order_add_payment(request, order_id):
         payment_method = data.get('payment_method')
         comment = data.get('comment', '')
 
-        # Валидация
         if not amount or amount <= 0:
             return JsonResponse({'success': False, 'error': 'Введите корректную сумму'})
 
@@ -1902,9 +1993,14 @@ def order_add_payment(request, order_id):
         if not payment_method:
             return JsonResponse({'success': False, 'error': 'Выберите способ оплаты'})
 
-        # Добавляем оплату
-        order.add_payment(amount, payment_method, request.user, comment)
-
+        payment = order.add_payment(amount, payment_method, request.user, comment)
+        log_action(
+            request,
+            'create',
+            'Payment',
+            order.id,
+            f"Оплата #{payment.id}"
+        )
         return JsonResponse({
             'success': True,
             'total_paid': float(order.total_paid),
