@@ -136,7 +136,7 @@ class Order(BaseModel):
         null=True,
         verbose_name='Причина обращения'
     )
-    ompleted_at = models.DateTimeField(null=True, blank=True, verbose_name='Дата завершения')
+    completed_at = models.DateTimeField(null=True, blank=True, verbose_name='Дата завершения')
 
     def total_amount(self):
         return sum(item.subtotal() for item in self.order_items.all())

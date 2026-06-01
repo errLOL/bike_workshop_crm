@@ -1,10 +1,209 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Title</title>
-</head>
-<body>
+{% extends 'inventorymanager/layout.html' %}
+{% load static %}
 
-</body>
-</html>
+{% block title %}Журнал действий{% endblock %}
+
+{% block extra_css %}
+<style>
+    .filter-bar {
+        background: white;
+        border-radius: 12px;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .action-badge {
+        font-size: 0.7rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 20px;
+    }
+    .action-create { background: #d4edda; color: #155724; }
+    .action-edit { background: #fff3cd; color: #856404; }
+    .action-delete { background: #f8d7da; color: #721c24; }
+    .action-status_change { background: #cce5ff; color: #004085; }
+    .action-payment { background: #d1ecf1; color: #0c5460; }
+    .action-stock_change { background: #e2d5f1; color: #4a1d6d; }
+    .action-login { background: #d4edda; color: #155724; }
+    .action-logout { background: #f8d7da; color: #721c24; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container-fluid py-4">
+    <!-- Заголовок -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">
+            <i class="fas fa-history me-2 text-primary"></i>Журнал действий
+        </h2>
+        <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>На дашборд
+        </a>
+    </div>
+
+    <!-- Панель фильтров -->
+    <div class="filter-bar">
+        <form method="get" class="row g-3">
+            <div class="col-md-2">
+                <label class="form-label small text-muted">Тип действия</label>
+                <select name="action_type" class="form-select">
+                    <option value="">Все</option>
+                    {% for value, label in action_types %}
+                    <option value="{{ value }}" {% if selected_action == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small text-muted">Пользователь</label>
+                <select name="user" class="form-select">
+                    <option value="">Все</option>
+                    {% for user in users %}
+                    <option value="{{ user.id }}" {% if selected_user|stringformat:"s" == user.id|stringformat:"s" %}selected{% endif %}>
+                        {{ user.get_full_name|default:user.username }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted">Модель</label>
+                <select name="model" class="form-select">
+                    <option value="">Все</option>
+                    <option value="Order" {% if selected_model == 'Order' %}selected{% endif %}>Заказы</option>
+                    <option value="Customer" {% if selected_model == 'Customer' %}selected{% endif %}>Клиенты</option>
+                    <option value="Product" {% if selected_model == 'Product' %}selected{% endif %}>Товары</option>
+                    <option value="Transport" {% if selected_model == 'Transport' %}selected{% endif %}>Техника</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted">С даты</label>
+                <input type="date" name="date_from" class="form-control" value="{{ date_from }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted">По дату</label>
+                <input type="date" name="date_to" class="form-control" value="{{ date_to }}">
+            </div>
+            <div class="col-md-1">
+                <label class="form-label small text-muted">&nbsp;</label>
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="fas fa-filter"></i>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Таблица логов -->
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Дата и время</th>
+                            <th>Пользователь</th>
+                            <th>Действие</th>
+                            <th>Объект</th>
+                            <th>IP адрес</th>
+                            <th>Изменения</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                        <tr>
+                            <td class="small text-nowrap">{{ log.created_at|date:"d.m.Y H:i:s" }}</td>
+                            <td>{{ log.user.get_full_name|default:log.user.username|default:"—" }}</td>
+                            <td>
+                                <span class="action-badge action-{{ log.action_type }}">
+                                    {{ log.get_action_type_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if log.object_id and log.model_name %}
+                                    <a href="{{ log.get_absolute_url }}" class="text-decoration-none">
+                                        {{ log.object_repr }}
+                                    </a>
+                                {% else %}
+                                    {{ log.object_repr|default:"—" }}
+                                {% endif %}
+                            </td>
+                            <td class="small">{{ log.ip_address|default:"—" }}</td>
+                            <td class="small">
+                                {% if log.changes %}
+                                    <button type="button" class="btn btn-sm btn-link p-0 text-primary" 
+                                            data-bs-toggle="modal" data-bs-target="#changesModal{{ log.id }}">
+                                        <i class="fas fa-info-circle"></i> Подробнее
+                                    </button>
+                                    <!-- Модалка с изменениями -->
+                                    <div class="modal fade" id="changesModal{{ log.id }}" tabindex="-1">
+                                        <div class="modal-dialog modal-dialog-centered">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h6 class="modal-title">Изменения в {{ log.object_repr }}</h6>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <pre class="small mb-0">{{ log.changes|pprint }}</pre>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center py-5 text-muted">
+                                <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
+                                Нет записей о действиях
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Пагинация -->
+    {% if is_paginated %}
+    <nav aria-label="Page navigation" class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                    <i class="fas fa-angle-double-left"></i>
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                    <i class="fas fa-angle-left"></i>
+                </a>
+            </li>
+            {% endif %}
+            
+            <li class="page-item active">
+                <span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+            </li>
+            
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                    <i class="fas fa-angle-right"></i>
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                    <i class="fas fa-angle-double-right"></i>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

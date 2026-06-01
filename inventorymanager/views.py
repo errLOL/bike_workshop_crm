@@ -19,7 +19,7 @@ from .forms import *
 from django.db.models import Sum, F, Q, Count, Avg
 import json
 
-from .utils import calculate_all_technicians_salary, calculate_technician_salary
+from .utils import calculate_all_technicians_salary, calculate_technician_salary, get_period_range, get_services_total
 
 
 def log_action(request, action_type, model_name, object_id, object_repr, changes=None):
@@ -300,9 +300,7 @@ def logout_view(request):
 @require_admin
 @login_required
 def salary_report(request):
-    """Отчёт по зарплатам техников с графиками и выбором периода"""
     User = get_user_model()
-    # Параметры периода
     period_type = request.GET.get('period', 'month')
     selected_date = request.GET.get('date')
 
@@ -322,30 +320,14 @@ def salary_report(request):
         except:
             technician_percents[tech.id] = 40
 
-    # Определяем дату начала и конца периода
-    if selected_date:
-        if period_type == 'week':
-            current_date = datetime.strptime(selected_date, '%Y-%m-%d')
-        elif period_type == 'month':
-            current_date = datetime.strptime(selected_date, '%Y-%m')
-        elif period_type == 'quarter':
-            year, quarter = selected_date.split('-Q')
-            year = int(year)
-            quarter = int(quarter)
-            month = (quarter - 1) * 3 + 1
-            current_date = date(year, month, 1)
-        else:  # year
-            current_date = datetime.strptime(selected_date, '%Y')
-    else:
-        current_date = timezone.now()
+    start_date, end_date = get_period_range(
+        period_type,
+        selected_date
+    )
 
     # Рассчитываем start_date и end_date
     if period_type == 'week':
-        start_date = current_date - timedelta(days=current_date.weekday())
-        end_date = start_date + timedelta(days=6)
         period_label = f"Неделя {start_date.strftime('%d.%m')} - {end_date.strftime('%d.%m.%Y')}"
-
-        # Данные для графика по дням
         chart_labels = []
         chart_services_data = []
         chart_salary_data = []
@@ -357,8 +339,8 @@ def salary_report(request):
 
             day_services = OrderItem.objects.filter(
                 order__status='issued',
-                order__created_at__gte=day_start,
-                order__created_at__lte=day_end,
+                order__completed_at__gte=day_start,
+                order__completed_at__lt=end_date,
                 product__product_type='service'
             ).aggregate(total=Sum(F('quantity') * F('unit_price')))['total'] or 0
 
@@ -366,10 +348,7 @@ def salary_report(request):
             chart_salary_data.append(float(day_services))  # TODO: посчитать зарплату по техникам
 
     elif period_type == 'month':
-        start_date = current_date.replace(day=1, hour=0, minute=0, second=0)
-        last_day = monthrange(current_date.year, current_date.month)[1]
-        end_date = current_date.replace(day=last_day, hour=23, minute=59, second=59)
-        period_label = f"Месяц {current_date.strftime('%B %Y')}"
+        period_label = f"Месяц {start_date.strftime('%B %Y')}"
 
         # Данные для графика по неделям
         days_in_month = (end_date - start_date).days + 1
@@ -387,8 +366,8 @@ def salary_report(request):
 
             week_services = OrderItem.objects.filter(
                 order__status='issued',
-                order__created_at__gte=week_start,
-                order__created_at__lte=week_end,
+                order__completed_at__gte=week_start,
+                order__completed_at__lt=end_date,
                 product__product_type='service'
             ).aggregate(total=Sum(F('quantity') * F('unit_price')))['total'] or 0
 
@@ -396,13 +375,8 @@ def salary_report(request):
             chart_salary_data.append(float(week_services))
 
     elif period_type == 'quarter':
-        quarter = (current_date.month - 1) // 3 + 1
-        start_date = current_date.replace(month=(quarter - 1) * 3 + 1, day=1)
-        if quarter == 4:
-            end_date = current_date.replace(year=current_date.year + 1, month=1, day=1) - timedelta(days=1)
-        else:
-            end_date = current_date.replace(month=quarter * 3 + 1, day=1) - timedelta(days=1)
-        period_label = f"Квартал {quarter} {current_date.year}"
+        quarter = (start_date.month - 1) // 3 + 1
+        period_label = f"Квартал {quarter} {start_date.year}"
 
         # Данные для графика по месяцам
         chart_labels = [f"{i+1} месяц" for i in range(3)]
@@ -415,8 +389,8 @@ def salary_report(request):
 
             month_services = OrderItem.objects.filter(
                 order__status='issued',
-                order__created_at__gte=month_start,
-                order__created_at__lte=month_end,
+                order__completed_at__gte=month_start,
+                order__completed_at__lt=end_date,
                 product__product_type='service'
             ).aggregate(total=Sum(F('quantity') * F('unit_price')))['total'] or 0
 
@@ -424,9 +398,7 @@ def salary_report(request):
             chart_salary_data.append(float(month_services))
 
     else:  # year
-        start_date = current_date.replace(month=1, day=1)
-        end_date = current_date.replace(month=12, day=31)
-        period_label = f"Год {current_date.year}"
+        period_label = f"Год {start_date.year}"
 
         # Данные для графика по месяцам
         chart_labels = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек']
@@ -442,16 +414,13 @@ def salary_report(request):
 
             month_services = OrderItem.objects.filter(
                 order__status='issued',
-                order__created_at__gte=month_start,
-                order__created_at__lte=month_end,
+                order__completed_at__gte=month_start,
+                order__completed_at__lt=end_date,
                 product__product_type='service'
             ).aggregate(total=Sum(F('quantity') * F('unit_price')))['total'] or 0
 
             chart_services_data.append(float(month_services))
             chart_salary_data.append(float(month_services))
-
-    end_date = end_date.replace(hour=23, minute=59, second=59)
-    start_date = start_date.replace(hour=0, minute=0, second=0)
 
     # Собираем данные по каждому технику
     salary_data = []
@@ -459,26 +428,30 @@ def salary_report(request):
     total_salary_all = 0
     technician_services = {}  # для графика по техникам
 
+    print(start_date)
+    print(end_date)
     for tech in technicians:
         percent = technician_percents.get(tech.id, 40)
-
         # Выручка от услуг за период
         services_total = OrderItem.objects.filter(
             order__employee=tech,
             order__status='issued',
-            order__created_at__gte=start_date,
-            order__created_at__lte=end_date,
+            order__completed_at__gte=start_date,
+            order__completed_at__lt=end_date,
             product__product_type='service'
         ).aggregate(total=Sum(F('quantity') * F('unit_price')))['total'] or 0
+        print(tech)
+        print(f"Total: {services_total}")
 
         salary = services_total * Decimal(percent / 100)
 
         orders_count = Order.objects.filter(
             employee=tech,
             status='issued',
-            created_at__gte=start_date,
-            created_at__lte=end_date
+            completed_at__gte=start_date,
+            completed_at__lt=end_date
         ).count()
+        print(f"orders count: {orders_count}")
 
         salary_data.append({
             'user': tech,
@@ -498,20 +471,34 @@ def salary_report(request):
     top_technicians = dict(sorted(technician_services.items(), key=lambda x: x[1], reverse=True)[:5])
 
     avg_service_per_technician = total_services_all / len(technicians) if len(technicians) > 0 else 0
-    avg_order_value = services_total / orders_count if orders_count > 0 else 0
+    total_orders = sum(
+        row["orders_count"]
+        for row in salary_data
+    )
+
+    avg_order_value = (
+        total_services_all / total_orders
+        if total_orders
+        else 0
+    )
     # Собираем доступные даты для селектов
     available_weeks = []
     available_months = []
     available_quarters = []
     available_years = []
 
-    order_dates = Order.objects.filter(
-        status='issued'
-    ).order_by('created_at')
+    order_dates = (
+        Order.objects
+        .filter(
+            status='issued',
+            completed_at__isnull=False
+        )
+        .order_by('completed_at')
+    )
 
     if order_dates.exists():
-        first_order = order_dates.first().created_at
-        last_order = order_dates.last().created_at
+        first_order = order_dates.first().completed_at
+        last_order = order_dates.last().completed_at
 
         # Недели (последние 12)
         for i in range(12):
@@ -538,23 +525,23 @@ def salary_report(request):
         # Кварталы
         quarters_seen = set()
         for order in order_dates:
-            quarter = (order.created_at.month - 1) // 3 + 1
-            quarter_key = f"{order.created_at.year}-Q{quarter}"
+            quarter = (order.completed_at.month - 1) // 3 + 1
+            quarter_key = f"{order.completed_at.year}-Q{quarter}"
             if quarter_key not in quarters_seen:
                 quarters_seen.add(quarter_key)
                 available_quarters.append({
                     'value': quarter_key,
-                    'label': f"{order.created_at.year} - Квартал {quarter}"
+                    'label': f"{order.completed_at.year} - Квартал {quarter}"
                 })
 
         # Годы
         years_seen = set()
         for order in order_dates:
-            if order.created_at.year not in years_seen:
-                years_seen.add(order.created_at.year)
+            if order.completed_at.year not in years_seen:
+                years_seen.add(order.completed_at.year)
                 available_years.append({
-                    'value': str(order.created_at.year),
-                    'label': str(order.created_at.year)
+                    'value': str(order.completed_at.year),
+                    'label': str(order.completed_at.year)
                 })
 
         available_months.sort(key=lambda x: x['value'])
@@ -594,66 +581,46 @@ def my_salary(request):
 
     period_type = request.GET.get('period', 'month')  # week, month, quarter, year
     selected_date = request.GET.get('date')
+    start_date, end_date = get_period_range(
+        period_type,
+        selected_date
+    )
 
-    if selected_date:
-        if period_type == 'week':
-            current_date = datetime.strptime(selected_date, '%Y-%m-%d')
-        elif period_type == 'month':
-            current_date = datetime.strptime(selected_date, '%Y-%m')
-        elif period_type == 'quarter':
-            year, quarter = selected_date.split('-Q')
-            year = int(year)
-            quarter = int(quarter)
-            month = (quarter - 1) * 3 + 1
-            current_date = date(year, month, 1)
-        else:  # year
-            current_date = datetime.strptime(selected_date, '%Y')
-    else:
-        current_date = timezone.now()
+    period_start = start_date.date()
 
-    # Рассчитываем start_date и end_date
     if period_type == 'week':
-        start_date = current_date - timedelta(days=current_date.weekday())
-        end_date = start_date + timedelta(days=6)
-        period_label = f"Неделя {start_date.strftime('%d.%m')} - {end_date.strftime('%d.%m.%Y')}"
-
-        # Для графика нужны дни недели
-        chart_labels = []
-        for i in range(7):
-            day = start_date + timedelta(days=i)
-            chart_labels.append(day.strftime('%a, %d.%m'))
+        week_end = (end_date - timedelta(days=1)).date()
+        period_label = (
+            f"Неделя "
+            f"{period_start.strftime('%d.%m')} - "
+            f"{week_end.strftime('%d.%m.%Y')}"
+        )
+        chart_labels = [
+            (period_start + timedelta(days=i)).strftime('%a, %d.%m')
+            for i in range(7)
+        ]
     elif period_type == 'month':
-        start_date = current_date.replace(day=1, hour=0, minute=0, second=0)
-        last_day = monthrange(current_date.year, current_date.month)[1]
-        end_date = current_date.replace(day=last_day, hour=23, minute=59, second=59)
-        period_label = f"Месяц {current_date.strftime('%B %Y')}"
-
-        # Для графика нужны недели месяца
-        chart_labels = [f"{i+1}-я неделя" for i in range(4)]
+        period_label = period_start.strftime('Месяц %B %Y')
+        chart_labels = [
+            f"{i + 1}-я неделя"
+            for i in range(4)
+        ]
     elif period_type == 'quarter':
-        quarter = (current_date.month - 1) // 3 + 1
-        start_date = current_date.replace(month=(quarter - 1) * 3 + 1, day=1)
-        if quarter == 4:
-            end_date = current_date.replace(year=current_date.year + 1, month=1, day=1) - timedelta(days=1)
-        else:
-            end_date = current_date.replace(month=quarter * 3 + 1, day=1) - timedelta(days=1)
-        period_label = f"Квартал {quarter} {current_date.year}"
+        quarter = (period_start.month - 1) // 3 + 1
+        period_label = f"Квартал {quarter} {period_start.year}"
+        chart_labels = [
+            "1 месяц",
+            "2 месяц",
+            "3 месяц",
+        ]
+    else:
+        period_label = f"Год {period_start.year}"
+        chart_labels = [
+            'Янв', 'Фев', 'Мар', 'Апр',
+            'Май', 'Июн', 'Июл', 'Авг',
+            'Сен', 'Окт', 'Ноя', 'Дек'
+        ]
 
-        # Для графика нужны месяцы квартала
-        months_in_quarter = [f"{m} месяц" for m in range(1, 4)]
-        chart_labels = months_in_quarter
-    else:  # year
-        start_date = current_date.replace(month=1, day=1)
-        end_date = current_date.replace(month=12, day=31)
-        period_label = f"Год {current_date.year}"
-
-        # Для графика нужны месяцы года
-        chart_labels = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек']
-
-    end_date = end_date.replace(hour=23, minute=59, second=59)
-    start_date = start_date.replace(hour=0, minute=0, second=0)
-
-    # Данные для графика
     chart_services_data = []
     chart_salary_data = []
 
@@ -661,86 +628,100 @@ def my_salary(request):
         # Понедельная детализация по дням
         for i in range(7):
             day_start = start_date + timedelta(days=i)
-            day_end = day_start + timedelta(days=1) - timedelta(seconds=1)
-
-            day_services = OrderItem.objects.filter(
-                order__employee=user,
-                order__status='issued',
-                order__created_at__gte=day_start,
-                order__created_at__lte=day_end,
-                product__product_type='service'
-            ).aggregate(total=Sum(F('quantity') * F('unit_price')))['total'] or 0
-
+            day_end = day_start + timedelta(days=1)
+            day_services = get_services_total(
+                OrderItem.objects.filter(
+                    order__employee=user,
+                    order__status='issued',
+                    order__completed_at__gte=day_start,
+                    order__completed_at__lt=day_end,
+                    product__product_type='service'
+                )
+            )
             chart_services_data.append(float(day_services))
-            chart_salary_data.append(float(day_services * Decimal(salary_percent / 100)))
+            chart_salary_data.append(
+                float(day_services * Decimal(salary_percent / 100))
+            )
 
     elif period_type == 'month':
         # Помесячная детализация по неделям
-        days_in_month = (end_date - start_date).days + 1
-        week_size = days_in_month // 4
+        days_in_month = (end_date - start_date).days
+        week_size = max(days_in_month // 4, 1)
+
         for week_num in range(4):
-            week_start = start_date + timedelta(days=week_num * week_size)
+
+            week_start = start_date + timedelta(
+                days=week_num * week_size
+            )
+
             if week_num == 3:
                 week_end = end_date
             else:
-                week_end = start_date + timedelta(days=(week_num + 1) * week_size - 1)
+                week_end = start_date + timedelta(
+                    days=(week_num + 1) * week_size
+                )
 
-            week_services = OrderItem.objects.filter(
-                order__employee=user,
-                order__status='issued',
-                order__created_at__gte=week_start,
-                order__created_at__lte=week_end,
-                product__product_type='service'
-            ).aggregate(total=Sum(F('quantity') * F('unit_price')))['total'] or 0
+            week_services = get_services_total(
+                OrderItem.objects.filter(
+                    order__employee=user,
+                    order__status='issued',
+                    order__completed_at__gte=week_start,
+                    order__completed_at__lt=week_end,
+                    product__product_type='service'
+                )
+            )
 
             chart_services_data.append(float(week_services))
-            chart_salary_data.append(float(week_services * Decimal(salary_percent / 100)))
+
+            chart_salary_data.append(
+                float(week_services * Decimal(salary_percent / 100))
+            )
 
     elif period_type == 'quarter':
         # Поквартальная детализация по месяцам
         for i in range(3):
             month_start = start_date + relativedelta(months=i)
-            month_end = month_start + relativedelta(months=1) - timedelta(days=1)
-
-            month_services = OrderItem.objects.filter(
-                order__employee=user,
-                order__status='issued',
-                order__created_at__gte=month_start,
-                order__created_at__lte=month_end,
-                product__product_type='service'
-            ).aggregate(total=Sum(F('quantity') * F('unit_price')))['total'] or 0
-
+            month_end = month_start + relativedelta(months=1)
+            month_services = get_services_total(
+                OrderItem.objects.filter(
+                    order__employee=user,
+                    order__status='issued',
+                    order__completed_at__gte=month_start,
+                    order__completed_at__lt=month_end,
+                    product__product_type='service'
+                )
+            )
             chart_services_data.append(float(month_services))
-            chart_salary_data.append(float(month_services * Decimal(salary_percent / 100)))
-
-    else:  # year
+            chart_salary_data.append(
+                float(month_services * Decimal(salary_percent / 100))
+            )
+    else:
         # Годовая детализация по месяцам
         for i in range(12):
-            month_start = start_date.replace(month=i+1)
-            if i+1 == 12:
-                month_end = month_start.replace(month=12, day=31)
-            else:
-                month_end = month_start.replace(month=i+2, day=1) - timedelta(days=1)
-
-            month_services = OrderItem.objects.filter(
-                order__employee=user,
-                order__status='issued',
-                order__created_at__gte=month_start,
-                order__created_at__lte=month_end,
-                product__product_type='service'
-            ).aggregate(total=Sum(F('quantity') * F('unit_price')))['total'] or 0
-
+            month_start = start_date + relativedelta(months=i)
+            month_end = month_start + relativedelta(months=1)
+            month_services = get_services_total(
+                OrderItem.objects.filter(
+                    order__employee=user,
+                    order__status='issued',
+                    order__completed_at__gte=month_start,
+                    order__completed_at__lt=month_end,
+                    product__product_type='service'
+                )
+            )
             chart_services_data.append(float(month_services))
-            chart_salary_data.append(float(month_services * Decimal(salary_percent / 100)))
+            chart_salary_data.append(
+                float(month_services * Decimal(salary_percent / 100))
+            )
 
-    # Итоги за период
+
     period_services_total = sum(chart_services_data)
     period_salary = period_services_total * (salary_percent / 100)
     period_orders_count = Order.objects.filter(
         employee=user,
         status='issued',
-        created_at__gte=start_date,
-        created_at__lte=end_date
+        completed_at__gte=start_date,
+        completed_at__lt=end_date
     ).count()
 
     # Список доступных дат для селектов
@@ -750,11 +731,19 @@ def my_salary(request):
     available_years = []
 
     # Собираем доступные периоды из заказов техника
-    order_dates = Order.objects.filter(employee=user).order_by('created_at')
+    order_dates = (
+    Order.objects
+        .filter(
+            employee=user,
+            status='issued',
+            completed_at__isnull=False
+        )
+        .order_by('completed_at')
+    )
 
     if order_dates.exists():
-        first_order = order_dates.first().created_at
-        last_order = order_dates.last().created_at
+        first_order = order_dates.first().completed_at
+        last_order = order_dates.last().completed_at
 
         # Недели (последние 12)
         for i in range(12):
@@ -781,23 +770,23 @@ def my_salary(request):
         # Кварталы
         quarters_seen = set()
         for order in order_dates:
-            quarter = (order.created_at.month - 1) // 3 + 1
-            quarter_key = f"{order.created_at.year}-Q{quarter}"
+            quarter = (order.completed_at.month - 1) // 3 + 1
+            quarter_key = f"{order.completed_at.year}-Q{quarter}"
             if quarter_key not in quarters_seen:
                 quarters_seen.add(quarter_key)
                 available_quarters.append({
                     'value': quarter_key,
-                    'label': f"{order.created_at.year} - Квартал {quarter}"
+                    'label': f"{order.completed_at.year} - Квартал {quarter}"
                 })
 
         # Годы
         years_seen = set()
         for order in order_dates:
-            if order.created_at.year not in years_seen:
-                years_seen.add(order.created_at.year)
+            if order.completed_at.year not in years_seen:
+                years_seen.add(order.completed_at.year)
                 available_years.append({
-                    'value': str(order.created_at.year),
-                    'label': str(order.created_at.year)
+                    'value': str(order.completed_at.year),
+                    'label': str(order.completed_at.year)
                 })
 
         # Сортируем
@@ -1640,8 +1629,6 @@ def change_order_status(request, order_id):
 @require_admin
 def action_logs(request):
     logs = ActionLog.objects.select_related('user').all().order_by('-created_at')
-
-    # Фильтры
     action_type = request.GET.get('action_type', '')
     if action_type:
         logs = logs.filter(action_type=action_type)
@@ -1649,6 +1636,10 @@ def action_logs(request):
     user_id = request.GET.get('user', '')
     if user_id:
         logs = logs.filter(user_id=user_id)
+
+    model_name = request.GET.get('model', '')
+    if model_name:
+        logs = logs.filter(model_name=model_name)
 
     date_from = request.GET.get('date_from', '')
     if date_from:
@@ -1658,18 +1649,22 @@ def action_logs(request):
     if date_to:
         logs = logs.filter(created_at__date__lte=date_to)
 
-    # Пагинация
     paginator = Paginator(logs, 50)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    # Список пользователей для фильтра
+    users = get_user_model().objects.filter(actionlog__isnull=False).distinct().order_by('first_name', 'username')
+
     context = {
         'logs': page_obj,
         'page_obj': page_obj,
+        'is_paginated': page_obj.has_other_pages(),
         'action_types': ActionLog.ACTION_TYPES,
-        'users': get_user_model().objects.filter(action_logs__isnull=False).distinct(),
+        'users': users,
         'selected_action': action_type,
         'selected_user': user_id,
+        'selected_model': model_name,
         'date_from': date_from,
         'date_to': date_to,
     }

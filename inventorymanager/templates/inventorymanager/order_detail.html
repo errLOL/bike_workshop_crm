@@ -181,7 +181,9 @@
                 <div class="card-body">
                     <div class="info-row">
                         <div class="info-label">Имя:</div>
-                        <div class="info-value"><strong>{{ order.customer.name|default:"—" }}</strong></div>
+                        <div class="info-value">
+                            <a href="{% url 'customer_detail' order.customer.id %}"><strong>{{ order.customer.name|default:"—" }}</strong></a>
+                        </div>
                     </div>
                     {% if order.customer.phone %}
                     <div class="info-row">
@@ -208,7 +210,9 @@
                 <div class="card-body">
                     <div class="info-row">
                         <div class="info-label">Название:</div>
-                        <div class="info-value"><strong>{{ order.transport.name|default:"—" }}</strong></div>
+                        <div class="info-value">
+                            <a href="{% url 'transport_detail' order.transport.id %}"><strong>{{ order.transport.name|default:"—" }}</strong></a>
+                        </div>
                     </div>
                     {% if order.transport.transport_type %}
                     <div class="info-row">
