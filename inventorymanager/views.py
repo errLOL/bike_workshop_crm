@@ -16,7 +16,7 @@ from django.views.decorators.http import require_http_methods
 from .decorators import require_order_access, require_admin
 from .models import Order, OrderItem
 from .forms import *
-from django.db.models import Sum, F, Q, Count, Avg
+from django.db.models import Sum, F, Q, Count, Avg, ExpressionWrapper, DecimalField
 import json
 
 from .utils import calculate_all_technicians_salary, calculate_technician_salary, get_period_range, get_services_total
@@ -197,7 +197,7 @@ def technician_dashboard(request):
     today_services = OrderItem.objects.filter(
         order__employee=user,
         order__status='issued',
-        order__updated_at__gte=today,
+        order__completed_at__gte=today,
         product__product_type='service'
     ).aggregate(total=Sum(F('quantity') * F('unit_price')))['total'] or 0
 
@@ -206,46 +206,83 @@ def technician_dashboard(request):
         employee=user
     ).filter(
         Q(status='accepted') | Q(status='in_work')
-    ).select_related('customer', 'transport').order_by('-created_at')[:10]
+    ).select_related('customer', 'transport').order_by('created_at')[:10]
 
     # Заказы, ожидающие запчасти
     awaiting_parts = Order.objects.filter(
         employee=user,
         status='waiting_spareparts'
-    ).select_related('customer', 'transport', 'employee').order_by('-created_at')[:10]
+    ).select_related('customer', 'transport', 'employee').order_by('created_at')[:10]
 
     # Завершенные заказы за неделю
     week_ago = timezone.now() - timedelta(days=7)
-    my_completed_orders = Order.objects.filter(
-        employee=user,
-        status='issued',
-        updated_at__gte=week_ago
-    ).select_related('customer', 'transport').order_by('-updated_at')
+    my_completed_orders = (
+        Order.objects
+        .filter(
+            employee=user,
+            status='issued',
+            completed_at__gte=week_ago
+        )
+        .annotate(
+            services_total=Sum(
+                ExpressionWrapper(
+                    F('order_items__quantity') *
+                    F('order_items__unit_price'),
+                    output_field=DecimalField()
+                ),
+                filter=Q(
+                    order_items__product__product_type='service'
+                )
+            )
+        )
+        .select_related(
+            'customer',
+            'transport'
+        )
+    )
 
-    # Добавляем доход техника для каждого заказа
     for order in my_completed_orders:
-        services_total = order.order_items.filter(product__product_type='service').aggregate(
-            total=Sum(F('quantity') * F('unit_price'))
-        )['total'] or 0
-        order.technician_earnings = services_total * Decimal(salary_percent / 100)
 
-    # Статистика
-    total_my_orders = Order.objects.filter(employee=user).count()
-    my_completed_count = Order.objects.filter(employee=user, status='issued').count()
-    my_in_progress_count = Order.objects.filter(employee=user, status='in_work').count()
-    my_awaiting_parts_count = Order.objects.filter(employee=user, status='waiting_spareparts').count()
+        order.technician_earnings = (
+            (order.services_total or 0)
+            * Decimal(salary_percent / 100)
+        )
+
+    orders_qs = Order.objects.filter(
+        employee=user
+    )
+    total_my_orders = orders_qs.count()
+    my_completed_count = orders_qs.filter(status='issued').count()
+    my_in_progress_count = orders_qs.filter(status='in_work').count()
+    my_awaiting_parts_count = orders_qs.filter(status='waiting_spareparts').count()
 
     if total_my_orders > 0:
         completion_rate = round((my_completed_count / total_my_orders) * 100, 1)
     else:
         completion_rate = 0
 
-    avg_order_value = Order.objects.filter(employee=user, status='issued').aggregate(
-        avg=Avg(F('order_items__quantity') * F('order_items__unit_price'))
-    )['avg'] or 0
+    completed_orders = (
+        Order.objects
+        .filter(
+            employee=user,
+            status='issued'
+        )
+        .annotate(
+            order_total=Sum(
+                F('order_items__quantity') *
+                F('order_items__unit_price')
+            )
+        )
+    )
 
-    # Уникальные клиенты
-    unique_customers_count = Order.objects.filter(employee=user).values('customer').distinct().count()
+    avg_order_value = (
+        completed_orders.aggregate(
+            avg=Avg('order_total')
+        )['avg']
+        or 0
+    )
+
+    unique_customers_count = orders_qs.values('customer').distinct().count()
     context = {
         'my_active_orders': my_active_orders,
         'awaiting_parts': awaiting_parts,
@@ -940,7 +977,7 @@ def create_customer(request):
 
             next_url = request.GET.get('next')
             if next_url:
-                return redirect(next_url)
+                return redirect(next_url+ f"?customer={form.instance.id}")
             return redirect('customers')
     else:
         form = CustomerForm()
@@ -1088,6 +1125,12 @@ def order_list(request):
     if date_to:
         orders = orders.filter(created_at__date__lte=date_to)
 
+    # Фильтр по технику
+    employee = request.GET.get('employee', '')
+    print(employee)
+    if employee:
+        orders = orders.filter(employee=employee)
+
     # Статистика для виджетов
     total_orders = Order.objects.count()
     accepted_count = Order.objects.filter(status='accepted').count()
@@ -1105,6 +1148,10 @@ def order_list(request):
     paginator = Paginator(orders, 15)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
+    User = get_user_model()
+    technicians = User.objects.filter(
+        Q(is_superuser=True) | Q(groups__name='Technician')
+    ).distinct().order_by('first_name', 'username')
 
     context = {
         'orders': page_obj,
@@ -1121,6 +1168,7 @@ def order_list(request):
         'status_filter': status,
         'date_from': date_from,
         'date_to': date_to,
+        'technicians': technicians,
     }
 
     return render(request, 'inventorymanager/orders.html', context)
@@ -1392,8 +1440,9 @@ def edit_product(request, product_id):
 
 
 @login_required
-@require_order_access
-def edit_order(request, order):
+# @require_order_access
+def edit_order(request, order_id):
+    order = get_object_or_404(Order, pk=order_id)
     customers = Customer.objects.all().order_by('name')
     transports = Transport.objects.select_related('customer').all()
     products = Product.objects.all().order_by('product_type', 'name')
@@ -1579,7 +1628,7 @@ def change_order_status(request, order_id):
 
     if status not in valid_statuses or order.status == status:
         messages.warning(request, f"Недопустимый статус заказа.")
-        return redirect('orders')
+        return redirect('order_detail', order_id=order.id)
 
     if status == 'in_work'  and order.status in ('accepted', 'waiting_spareparts'):
         with transaction.atomic():
@@ -1609,6 +1658,9 @@ def change_order_status(request, order_id):
         messages.info(request, 'Запчасти возвращены на склад')
 
     if order.status != 'issued' and status == 'issued':
+        if order.debt > 0:
+            messages.error(request, f"Ошибка! Не закрытый долг до заказу. Сумма {order.debt}")
+            return redirect('order_detail', order_id=order.id)
         order.completed_at = timezone.now()
 
     log_action(
@@ -1622,7 +1674,7 @@ def change_order_status(request, order_id):
     order.status = status
     order.save()
     messages.success(request, f'Заказ #{order.id} отмечен как "{order.get_status_display()}"')
-    return redirect('orders')
+    return redirect('order_detail', order_id=order.id)
 
 
 @login_required

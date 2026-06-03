@@ -171,6 +171,14 @@
                 </select>
             </div>
             <div class="col-md-3">
+                <select name="employee" class="form-select">
+                    <option value="">Все сотрудники</option>
+                    {% for tech in technicians %}
+                        <option value="{{ tech.id }}">{{ tech.get_full_name|default:tech.username }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
                 <input type="date" name="date_from" class="form-control" placeholder="С даты"
                        value="{{ request.GET.date_from|default:'' }}">
             </div>
