@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Заказ-наряд №{{ order.id }}</title>
+
+{% load static %}
+<style>
+
+@page {
+    size: A4;
+    margin: 8mm;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.2;
+    color: #000;
+    margin: 0;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.document-header {
+    text-align: center;
+    margin-bottom: 8px;
+}
+
+.company-name {
+    font-size: 16px;
+    font-weight: bold;
+}
+.company-name img {
+    width: 350px;
+}
+
+.company-info {
+    font-size: 9px;
+    margin-top: 2px;
+}
+
+.document-title {
+    margin-top: 25px;
+    font-size: 25px;
+    font-weight: bold;
+}
+
+.document-number {
+    margin-top: 2px;
+    font-size: 10px;
+}
+
+.section {
+    margin-top: 8px;
+}
+
+.section-title {
+    font-size: 11px;
+    font-weight: bold;
+    border-bottom: 1px solid #000;
+    padding-bottom: 2px;
+    margin-bottom: 4px;
+}
+
+.info-table td {
+    padding: 2px 4px;
+    vertical-align: top;
+}
+
+.label {
+    width: 130px;
+    font-weight: bold;
+}
+
+.box {
+    border: 1px solid #000;
+    padding: 5px;
+    min-height: 40px;
+}
+
+.items-table {
+    margin-top: 4px;
+}
+
+.items-table th,
+.items-table td {
+    border: 1px solid #000;
+    padding: 3px;
+    font-size: 9px;
+}
+
+.items-table th {
+    text-align: center;
+    font-weight: bold;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.text-right {
+    text-align: right;
+}
+
+.total-block {
+    width: 260px;
+    margin-left: auto;
+    margin-top: 6px;
+}
+
+.total-block td {
+    border: 1px solid #000;
+    padding: 4px;
+}
+
+.total-row {
+    font-weight: bold;
+    font-size: 11px;
+}
+
+.conditions {
+    margin-top: 8px;
+    border: 1px solid #000;
+    padding: 5px;
+    font-size: 10px;
+}
+.order-info {
+    margin: 20px 0;
+}
+
+.claim-line {
+    margin-top: 18px;
+    border-top: 1px solid #000;
+    text-align: center;
+    padding-top: 2px;
+}
+
+.signatures {
+    margin-top: 25px;
+}
+
+.signature-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.signature-box {
+    width: 48%;
+    font-size: 12px;
+}
+
+.signature-line {
+    margin-top: 25px;
+    border-top: 1px solid #000;
+    text-align: center;
+    padding-top: 2px;
+}
+
+.footer {
+    margin-top: 30px;
+    text-align: center;
+    font-size: 8px;
+}
+
+@media print {
+
+    body {
+        margin: 0;
+    }
+
+    * {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="document-header">
+
+    <div class="company-name">
+        <img src="{% static 'inventorymanager/img/1.svg'%}" alt="">
+    </div>
+
+    <div class="company-info">
+        {{ company_address|default:"" }}
+        {% if company_phone %}
+            | {{ company_phone }}
+        {% endif %}
+    </div>
+
+    <div class="document-title">
+        ЗАКАЗ-НАРЯД № {{ order.id }}
+    </div>
+
+    <div class="document-number">
+        от {{ order.created_at|date:"d.m.Y" }}
+    </div>
+
+</div>
+
+<div class="section">
+
+    <div class="section-title">
+        Клиент
+    </div>
+
+    <table class="info-table">
+
+        <tr>
+            <td class="label">ФИО</td>
+            <td>{{ order.customer.name|default:"—" }}</td>
+        </tr>
+
+        <tr>
+            <td class="label">Телефон</td>
+            <td>{{ order.customer.phone|default:"—" }}</td>
+        </tr>
+
+        {% if order.customer.telegram %}
+        <tr>
+            <td class="label">Telegram</td>
+            <td>@{{ order.customer.telegram }}</td>
+        </tr>
+        {% endif %}
+
+    </table>
+
+</div>
+
+<div class="section">
+
+    <div class="section-title">
+        Техника
+    </div>
+
+    <table class="info-table">
+
+        <tr>
+            <td class="label">Наименование</td>
+            <td>{{ order.transport.name|default:"—" }}</td>
+        </tr>
+
+        {% if order.transport.serial_number %}
+        <tr>
+            <td class="label">Серийный номер</td>
+            <td>{{ order.transport.serial_number }}</td>
+        </tr>
+        {% endif %}
+
+        {% if order.transport.color %}
+        <tr>
+            <td class="label">Цвет</td>
+            <td>{{ order.transport.color }}</td>
+        </tr>
+        {% endif %}
+
+    </table>
+
+
+</div>
+
+{% if order.description %}
+<div class="section">
+
+    <div class="section-title">
+        Описание проблемы/комментарий
+    </div>
+
+    <div class="box">
+        {{ order.description|linebreaksbr }}
+    </div>
+
+</div>
+{% endif %}
+
+<div class="section">
+
+    <div class="section-title">
+        Выполненные работы и материалы
+    </div>
+
+    <table class="items-table">
+
+        <thead>
+        <tr>
+            <th width="25">№</th>
+            <th>Наименование</th>
+            <th width="70">Тип</th>
+            <th width="50">Кол.</th>
+            <th width="80">Цена</th>
+            <th width="90">Сумма</th>
+        </tr>
+        </thead>
+
+        <tbody>
+
+        {% for item in order.order_items.all %}
+
+        <tr>
+
+            <td class="text-center">
+                {{ forloop.counter }}
+            </td>
+
+            <td>
+                {{ item.product.name }}
+            </td>
+
+            <td class="text-center">
+
+                {% if item.product.product_type == 'service' %}
+                    Услуга
+                {% else %}
+                    Запчасть
+                {% endif %}
+
+            </td>
+
+            <td class="text-center">
+                {{ item.quantity }}
+            </td>
+
+            <td class="text-right">
+                {{ item.unit_price|floatformat:2 }} ₽
+            </td>
+
+            <td class="text-right">
+                {{ item.subtotal|floatformat:2 }} ₽
+            </td>
+
+        </tr>
+
+        {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</div>
+
+<div class="total-block">
+
+    <table>
+
+        <tr>
+            <td>Сумма заказа</td>
+            <td class="text-right">
+                {{ order.total_amount|floatformat:2 }} ₽
+            </td>
+        </tr>
+
+        <tr>
+            <td>Оплачено</td>
+            <td class="text-right">
+                {{ order.total_paid|floatformat:2 }} ₽
+            </td>
+        </tr>
+
+        <tr class="total-row">
+            <td>К оплате</td>
+            <td class="text-right">
+                {{ order.debt|floatformat:2 }} ₽
+            </td>
+        </tr>
+
+    </table>
+
+</div>
+
+<div class="conditions">
+    <strong>Условия:</strong>
+    Гарантия на выполненные работы составляет 30 дней.
+    Получатель проверил комплектность техники и не имеет претензий к качеству выполненных работ.
+</div>
+
+<div class="order-info">
+
+    Дата выдачи:
+    <strong>{{ order.completed_at|date:"d.m.Y H:i" }}</strong>
+
+</div>
+
+
+<div class="signatures">
+
+    <div class="signature-row">
+
+        <div class="signature-box">
+
+            Технику получил,
+            претензий не имею.
+
+            <div class="signature-line">
+                Подпись клиента
+            </div>
+
+        </div>
+
+        <div class="signature-box">
+
+            Работы выполнены
+            в полном объёме.
+
+            <div class="signature-line">
+                Подпись мастера
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<div class="footer">
+
+    Документ сформирован автоматически
+    {{ current_date|date:"d.m.Y H:i" }}
+
+</div>
+
+</body>
+</html>

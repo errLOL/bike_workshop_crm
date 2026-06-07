@@ -33,8 +33,10 @@ urlpatterns = [
     path('product/<int:product_id>', views.product_detail, name='product_detail'),
     path('order/<int:order_id>', views.order_detail, name='order_detail'),
     path("order_add_payment/<int:order_id>", views.order_add_payment, name="order_add_payment"),
+    path('order/<int:order_id>/print/', views.order_print, name='order_print'),
     path('category/<int:id>', views.category_detail, name='category_detail'),
     path('transport_detail/<int:transport_id>', views.transport_detail, name='transport_detail'),
+    path('cash-transaction/detail/<int:transaction_id>', views.cash_transaction_detail, name='cash_transaction_detail'),
     # Edit urls
     path("cash_register_close_shift/<int:register_id>", views.cash_register_close_shift, name="cash_register_close_shift"),
     path('edit_supplier/<int:id>', views.edit_supplier, name='edit_supplier'),

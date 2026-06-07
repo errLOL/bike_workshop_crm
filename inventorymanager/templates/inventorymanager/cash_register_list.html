@@ -3,9 +3,50 @@
 
 {% block title %}Касса{% endblock %}
 
+{% block extra_css %}
+<style>
+    .balance-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 16px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+    }
+    .balance-number {
+        font-size: 2rem;
+        font-weight: 700;
+    }
+    .stat-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1rem;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .stat-income {
+        color: #28a745;
+        font-size: 1.5rem;
+        font-weight: 700;
+    }
+    .stat-expense {
+        color: #dc3545;
+        font-size: 1.5rem;
+        font-weight: 700;
+    }
+    .filter-bar {
+        background: white;
+        border-radius: 12px;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+</style>
+{% endblock %}
+
 {% block body %}
 <div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <!-- Заголовок -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="mb-0">
             <i class="fas fa-cash-register me-2 text-primary"></i>Касса: {{ cash_register.name }}
         </h2>
@@ -13,74 +54,72 @@
             <a href="{% url 'cash_transaction_create' %}" class="btn btn-primary">
                 <i class="fas fa-plus me-1"></i>Новая операция
             </a>
-            <a href="{% url 'cash_register_close_shift' cash_register.id %}" class="btn btn-outline-secondary">
-                <i class="fas fa-chart-line me-1"></i>Закрыть смену
-            </a>
+            <button onclick="window.print();" class="btn btn-outline-secondary">
+                <i class="fas fa-print me-1"></i>Печать
+            </button>
         </div>
     </div>
-    
-    <!-- Баланс -->
+
+    <!-- Баланс и статистика -->
     <div class="row mb-4">
         <div class="col-md-4">
-            <div class="card bg-success text-white">
-                <div class="card-body">
-                    <div class="small">Приход</div>
-                    <div class="h3">+{{ total_income|floatformat:2 }} ₽</div>
-                </div>
+            <div class="balance-card">
+                <div class="small opacity-75">Текущий остаток</div>
+                <div class="balance-number">{{ current_balance|floatformat:2 }} ₽</div>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="card bg-danger text-white">
-                <div class="card-body">
-                    <div class="small">Расход</div>
-                    <div class="h3">-{{ total_expense|floatformat:2 }} ₽</div>
-                </div>
+            <div class="stat-card">
+                <div class="text-muted small">Приход</div>
+                <div class="stat-income">+{{ total_income|floatformat:2 }} ₽</div>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="card bg-primary text-white">
-                <div class="card-body">
-                    <div class="small">Текущий остаток</div>
-                    <div class="h3">{{ current_balance|floatformat:2 }} ₽</div>
-                </div>
+            <div class="stat-card">
+                <div class="text-muted small">Расход</div>
+                <div class="stat-expense">-{{ total_expense|floatformat:2 }} ₽</div>
             </div>
         </div>
     </div>
-    
+
+    <!-- Фильтры -->
+    <div class="filter-bar">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <select name="operation_type" class="form-select">
+                    <option value="">Все операции</option>
+                    <option value="income" {% if operation_type_filter == 'income' %}selected{% endif %}>Приход</option>
+                    <option value="expense" {% if operation_type_filter == 'expense' %}selected{% endif %}>Расход</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select name="payment_method" class="form-select">
+                    <option value="">Все способы</option>
+                    <option value="cash" {% if payment_method_filter == 'cash' %}selected{% endif %}>Наличные</option>
+                    <option value="card" {% if payment_method_filter == 'card' %}selected{% endif %}>Карта</option>
+                    <option value="transfer" {% if payment_method_filter == 'transfer' %}selected{% endif %}>Перевод</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <input type="date" name="date_from" class="form-control" value="{{ date_from }}" placeholder="С даты">
+            </div>
+            <div class="col-md-2">
+                <input type="date" name="date_to" class="form-control" value="{{ date_to }}" placeholder="По дату">
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="fas fa-filter me-1"></i>Применить
+                </button>
+            </div>
+        </form>
+    </div>
+
     <!-- Таблица операций -->
     <div class="card shadow-sm">
-        <div class="card-body">
-            <!-- Фильтры -->
-            <form method="get" class="row g-3 mb-4">
-                <div class="col-md-3">
-                    <select name="operation_type" class="form-select">
-                        <option value="">Все операции</option>
-                        <option value="income" {% if operation_type_filter == 'income' %}selected{% endif %}>Приход</option>
-                        <option value="expense" {% if operation_type_filter == 'expense' %}selected{% endif %}>Расход</option>
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <select name="payment_method" class="form-select">
-                        <option value="">Все способы</option>
-                        <option value="cash" {% if payment_method_filter == 'cash' %}selected{% endif %}>Наличные</option>
-                        <option value="card" {% if payment_method_filter == 'card' %}selected{% endif %}>Карта</option>
-                        <option value="transfer" {% if payment_method_filter == 'transfer' %}selected{% endif %}>Перевод</option>
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <input type="date" name="date_from" class="form-control" value="{{ date_from }}" placeholder="С даты">
-                </div>
-                <div class="col-md-2">
-                    <input type="date" name="date_to" class="form-control" value="{{ date_to }}" placeholder="По дату">
-                </div>
-                <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100">Фильтр</button>
-                </div>
-            </form>
-            
+        <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead>
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
                         <tr>
                             <th>Дата</th>
                             <th>Тип</th>
@@ -89,34 +128,49 @@
                             <th>Основание</th>
                             <th>Сотрудник</th>
                             <th>Заказ</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for t in transactions %}
+                        {% for transaction in transactions %}
                         <tr>
-                            <td>{{ t.created_at|date:"d.m.Y H:i" }}</td>
+                            <td>{{ transaction.created_at|date:"d.m.Y H:i" }}</td>
                             <td>
-                                {% if t.operation_type == 'income' %}
+                                {% if transaction.operation_type == 'income' %}
                                     <span class="badge bg-success">Приход</span>
                                 {% else %}
                                     <span class="badge bg-danger">Расход</span>
                                 {% endif %}
                             </td>
-                            <td class="fw-bold">{{ t.amount|floatformat:2 }} ₽</td>
-                            <td>{{ t.get_payment_method_display }}</td>
-                            <td>{{ t.reason }}</td>
-                            <td>{{ t.employee.get_full_name|default:t.employee.username }}</td>
+                            <td class="fw-bold {% if transaction.operation_type == 'income' %}text-success{% else %}text-danger{% endif %}">
+                                {{ transaction.amount|floatformat:2 }} ₽
+                            </td>
+                            <td>{{ transaction.get_payment_method_display }}</td>
                             <td>
-                                {% if t.order %}
-                                    <a href="{% url 'order_detail' t.order.id %}">#{{ t.order.id }}</a>
+                                <a href="#" onclick="showDetails({{ transaction.id }}); return false;">
+                                    {{ transaction.reason|truncatewords:8 }}
+                                </a>
+                            </td>
+                            <td>{{ transaction.employee.get_full_name|default:transaction.employee.username }}</td>
+                            <td>
+                                {% if transaction.order %}
+                                    <a href="{% url 'order_detail' transaction.order.id %}">№{{ transaction.order.id }}</a>
                                 {% else %}
                                     —
                                 {% endif %}
                             </td>
+                            <td>
+                                <a href="#" onclick="showDetails({{ transaction.id }}); return false;" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </td>
                          </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="7" class="text-center">Нет операций</td>
+                            <td colspan="8" class="text-center py-5 text-muted">
+                                <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
+                                Нет кассовых операций
+                            </td>
                          </tr>
                         {% endfor %}
                     </tbody>
@@ -124,5 +178,83 @@
             </div>
         </div>
     </div>
+
+    <!-- Пагинация -->
+    {% if is_paginated %}
+    <nav aria-label="Page navigation" class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                    <i class="fas fa-angle-double-left"></i>
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                    <i class="fas fa-angle-left"></i>
+                </a>
+            </li>
+            {% endif %}
+
+            <li class="page-item active">
+                <span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+            </li>
+
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                    <i class="fas fa-angle-right"></i>
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                    <i class="fas fa-angle-double-right"></i>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
 </div>
+
+<!-- Модалка просмотра операции -->
+<div class="modal fade" id="transactionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Детали операции</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="transactionDetails">
+                <!-- Загружается через AJAX -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function showDetails(transactionId) {
+    fetch(`/cash-transaction/detail/${transactionId}`)
+        .then(response => response.json())
+        .then(data => {
+            const details = `
+                <div class="info-row"><strong>Дата:</strong> ${data.created_at}</div>
+                <div class="info-row"><strong>Тип:</strong> ${data.operation_type_display}</div>
+                <div class="info-row"><strong>Сумма:</strong> ${data.amount} ₽</div>
+                <div class="info-row"><strong>Способ оплаты:</strong> ${data.payment_method_display}</div>
+                <div class="info-row"><strong>Основание:</strong> ${data.reason}</div>
+                <div class="info-row"><strong>Комментарий:</strong> ${data.comment || '—'}</div>
+                <div class="info-row"><strong>Сотрудник:</strong> ${data.employee}</div>
+                ${data.order ? `<div class="info-row"><strong>Заказ:</strong> №${data.order}</div>` : ''}
+                <div class="info-row"><strong>Касса:</strong> ${data.cash_register}</div>
+            `;
+            document.getElementById('transactionDetails').innerHTML = details;
+            new bootstrap.Modal(document.getElementById('transactionModal')).show();
+        })
+        .catch(error => console.error('Error:', error));
+}
+</script>
 {% endblock %}

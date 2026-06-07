@@ -466,9 +466,9 @@
                 <a href="{% url 'orders' %}" class="btn btn-secondary">
                     <i class="fas fa-arrow-left me-1"></i>Назад к списку
                 </a>
-                <button onclick="window.print();" class="btn btn-info text-white">
-                    <i class="fas fa-print me-1"></i>Печать
-                </button>
+                <a href="{% url 'order_print' order.id %}" class="btn btn-info text-white" target="_blank">
+                    <i class="fas fa-print me-1"></i>Печать наряда
+                </a>
                 {% if order.status != 'issued' %}
                 <a href="{% url 'edit_order' order.id %}" class="btn btn-warning text-white">
                     <i class="fas fa-edit me-1"></i>Редактировать

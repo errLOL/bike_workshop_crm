@@ -1796,8 +1796,6 @@ def delete_category(request, id):
 @login_required
 @require_admin
 def cash_register_list(request):
-    """Список кассовых операций"""
-    # Определяем текущую кассу (по умолчанию первую активную)
     cash_register = CashRegister.objects.filter(is_active=True).first()
 
     transactions = CashTransaction.objects.filter(
@@ -1849,25 +1847,27 @@ def cash_register_list(request):
 
 @login_required
 def cash_transaction_create(request):
-    """Создание кассовой операции"""
     if request.method == 'POST':
         form = CashTransactionForm(request.POST)
         if form.is_valid():
             transaction = form.save(commit=False)
             transaction.employee = request.user
             transaction.save()
+
+            # Логируем действие
+            log_action(request, 'create', 'CashTransaction', transaction.id,
+                      f"Кассовая операция #{transaction.id}: {transaction.get_operation_type_display()} {transaction.amount}₽")
+
             messages.success(request, f'Операция "{transaction.reason}" создана')
             return redirect('cash_register_list')
     else:
-        # Предзаполнение кассы
         initial = {}
         cash_register = CashRegister.objects.filter(is_active=True).first()
         if cash_register:
             initial['cash_register'] = cash_register.id
         form = CashTransactionForm(initial=initial)
 
-    return render(request, 'inventorymanager/cash_transaction_form.html', {'form': form, 'title': 'Новая операция'})
-
+    return render(request, 'inventorymanager/createCashTransaction.html', {'form': form, 'title': 'Новая операция'})
 
 @login_required
 @require_admin
@@ -2057,3 +2057,34 @@ def order_add_payment(request, order_id):
 
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
+
+
+@login_required
+def cash_transaction_detail(request, transaction_id):
+    transaction = get_object_or_404(CashTransaction, id=transaction_id)
+    return JsonResponse({
+        'id': transaction.id,
+        'created_at': transaction.created_at.strftime('%d.%m.%Y %H:%M'),
+        'operation_type_display': transaction.get_operation_type_display(),
+        'amount': f"{transaction.amount:,.2f}".replace(',', ' '),
+        'payment_method_display': transaction.get_payment_method_display(),
+        'reason': transaction.reason,
+        'comment': transaction.comment,
+        'employee': transaction.employee.get_full_name() or transaction.employee.username if transaction.employee else '—',
+        'order': transaction.order.id if transaction.order else None,
+        'cash_register': transaction.cash_register.name if transaction.cash_register else '—',
+    })
+
+@login_required
+def order_print(request, order_id):
+    order = get_object_or_404(Order.objects.select_related('customer', 'transport', 'employee'), id=order_id)
+
+    context = {
+        'order': order,
+        'company_name': 'Spica Bike',
+        'company_address': 'г. Казань, ул. Максимова, д. 20',
+        'company_phone': '+7 (987) 864-77-80',
+        'company_email': 'info@spicabike.ru',
+        'current_date': timezone.now(),
+    }
+    return render(request, 'inventorymanager/order_print.html', context)

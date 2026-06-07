@@ -100,7 +100,7 @@
         </a>
     </div>
 
-    <!-- Статистика техника -->
+
     <div class="row mb-4 g-3">
         <div class="col-md-3 col-sm-6">
             <div class="stat-card">
@@ -191,14 +191,13 @@
     </div>
 
     <div class="row">
-        <!-- Мои активные заказы -->
         <div class="col-lg-6">
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">
                         <i class="fas fa-tasks me-2 text-primary"></i>Мои активные заказы
                     </h5>
-                    <a href="{% url 'orders' %}?status=accepted&amp;status=in_work" class="btn btn-sm btn-link">
+                    <a href="{% url 'orders' %}?status=accepted&amp;status=in_work&amp;emploee={{user.id}}" class="btn btn-sm btn-link">
                         Все активные <i class="fas fa-arrow-right ms-1"></i>
                     </a>
                 </div>
@@ -238,14 +237,14 @@
             </div>
         </div>
 
-        <!-- Заказы, ожидающие запчасти -->
+
         <div class="col-lg-6">
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">
                         <i class="fas fa-clock me-2 text-warning"></i>Ожидают запчасти
                     </h5>
-                    <a href="{% url 'orders' %}?status=waiting_spareparts" class="btn btn-sm btn-link">
+                    <a href="{% url 'orders' %}?status=waiting_spareparts&amp;emploee={{user.id}}" class="btn btn-sm btn-link">
                         Все ожидающие <i class="fas fa-arrow-right ms-1"></i>
                     </a>
                 </div>
@@ -293,7 +292,7 @@
             <h5 class="mb-0">
                 <i class="fas fa-check-circle me-2 text-success"></i>Недавние завершённые заказы
             </h5>
-            <a href="{% url 'orders' %}?status=issued" class="btn btn-sm btn-link">
+            <a href="{% url 'orders' %}?status=issued&amp;emploee={{user.id}}" class="btn btn-sm btn-link">
                 Все завершённые <i class="fas fa-arrow-right ms-1"></i>
             </a>
         </div>
