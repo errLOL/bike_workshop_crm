@@ -293,7 +293,7 @@ class CashTransaction(models.Model):
     reason = models.CharField(max_length=200, verbose_name='Основание')
     comment = models.TextField(blank=True, null=True, verbose_name='Комментарий')
 
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата операции')
+    created_at = models.DateTimeField(default=timezone.now, verbose_name='Дата операции')
 
     def __str__(self):
         return f"{self.get_operation_type_display()} - {self.amount}₽ - {self.reason}"

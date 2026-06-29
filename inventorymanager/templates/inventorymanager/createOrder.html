@@ -31,7 +31,7 @@
         </div>
         {% endif %}
 
-        {% if formset.errors %}
+        {% if formset.total_error_count %}
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             <strong>Ошибки в позициях заказа:</strong>
             {% for error_list in formset.errors %}
@@ -120,22 +120,16 @@
                             <tr class="item-row" data-index="{{ forloop.counter0 }}">
                                  <td>
                                     {{ item_form.id }}
-                                    <select name="{{ item_form.product.html_name }}"
-                                            class="product-select form-select"
-                                            id="{{ item_form.product.id_for_label }}"
-                                            data-product-id="{{ item_form.product.value|default:'' }}">
-                                        <option value="">---------</option>
-                                        {% for product in products %}
-                                        <option value="{{ product.id }}"
-                                                data-price="{{ product.unit_cost }}"
-                                                data-type="{{ product.product_type }}"
-                                                data-name="{{ product.name }}"
-                                                {% if product.image %}data-image="{{ product.image.url }}"{% endif %}
-                                                {% if item_form.product.value == product.id %}selected{% endif %}>
-                                            {{ product.name }}
-                                        </option>
-                                        {% endfor %}
-                                    </select>
+                                     <input
+                                        type="hidden"
+                                        name="{{ item_form.product.html_name }}"
+                                        class="product-id-input product-select"
+                                        id="{{ item_form.product.id_for_label }}"
+                                        value="{{ item_form.product.value|default:'' }}"
+                                        data-product-id="{{ item_form.product.value|default:'' }}">
+                                     <div class="product-picker btn btn-light w-100 text-start">
+                                        Выберите товар
+                                    </div>
                                 </td>
                                 <td class="product-type-col">
                                     <span class="badge product-type-badge bg-secondary">—</span>
@@ -208,18 +202,12 @@
 <template id="empty-row-template">
     <tr class="item-row" data-index="__prefix__">
         <td class="product-col">
-            <select name="order_items-__prefix__-product" class="product-select form-select" id="id_order_items-__prefix__-product">
-                <option value="">---------</option>
-                {% for product in products %}
-                <option value="{{ product.id }}"
-                        data-price="{{ product.unit_cost }}"
-                        data-type="{{ product.product_type }}"
-                        data-name="{{ product.name|escapejs }}"
-                        {% if product.image %}data-image="{{ product.image.url }}"{% endif %}>
-                    {{ product.name }}
-                </option>
-                {% endfor %}
-            </select>
+            <input type="hidden" name="order_items-__prefix__-product"
+            id="id_order_items-__prefix__-product"
+            class="product-id-input">
+             <div class="product-picker btn btn-light w-100 text-start">
+                Выберите товар
+            </div>
         </td>
         <td class="product-type-col">
             <span class="badge product-type-badge bg-secondary">—</span>
@@ -241,26 +229,47 @@
         </td>
     </tr>
 </template>
+
+<div class="modal fade" id="productCatalogModal" tabindex="-1">
+    <div class="modal-dialog modal-fullscreen">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    Выбор товара
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal">
+                </button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="sticky-top bg-white p-3 border-bottom">
+                    <input
+                        type="text"
+                        id="catalog-search"
+                        class="form-control"
+                        placeholder="Поиск товара или услуги">
+                    <div class="btn-group w-100 mt-3">
+                        <button class="btn btn-primary catalog-filter active" data-filter="all">
+                            Все
+                        </button>
+                        <button class="btn btn-outline-primary catalog-filter" data-filter="service">
+                            Услуги
+                        </button>
+                        <button class="btn btn-outline-primary catalog-filter" data-filter="part">
+                            Запчасти
+                        </button>
+                    </div>
+                </div>
+                <div id="catalog-list" class="p-3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_css %}
 <style>
-    /* Стили для Select2 в Bootstrap 5 */
-    .select2-container--bootstrap-5 .select2-selection {
-        min-height: 38px;
-        border: 1px solid #ced4da;
-        border-radius: 0.375rem;
-    }
-    .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
-        line-height: 36px;
-        padding-left: 12px;
-    }
-    .select2-container--bootstrap-5 .select2-selection--single .select2-selection__arrow {
-        height: 36px;
-    }
-    .select2-dropdown {
-        border-radius: 0.375rem;
-    }
+
     .item-row td {
         vertical-align: middle;
     }
@@ -277,6 +286,64 @@
     .quantity-input {
         max-width: 100px;
     }
+    .catalog-item{
+        display:flex;
+        align-items:center;
+        gap:12px;
+
+        padding:12px;
+        margin-bottom:10px;
+
+        border:1px solid #e9ecef;
+        border-radius:12px;
+
+        cursor:pointer;
+    }
+
+    .catalog-item:hover{
+        background:#f8f9fa;
+    }
+
+    .catalog-image{
+        width:72px;
+        height:72px;
+
+        border-radius:8px;
+
+        object-fit:cover;
+        flex-shrink:0;
+    }
+
+    .catalog-placeholder{
+        width:72px;
+        height:72px;
+
+        background:#f1f3f5;
+
+        border-radius:8px;
+    }
+
+    .catalog-price{
+        font-weight:700;
+        color:#0d6efd;
+    }
+
+    .catalog-stock{
+        font-size:.85rem;
+    }
+
+    .selected-product{
+        display:flex;
+        align-items:center;
+        gap:8px;
+    }
+
+    .selected-product img{
+        width:30px;
+        height:30px;
+        border-radius:4px;
+        object-fit:cover;
+    }
     @media (max-width: 768px) {
         .table-responsive {
             font-size: 0.85rem;
@@ -288,13 +355,7 @@
             padding: 0.2rem 0.4rem;
         }
 
-        .select2-dropdown {
-            width: 340px !important;
-        }
 
-        .select2-container {
-            width: 100% !important;
-        }
     }
 </style>
 {% endblock %}
@@ -306,11 +367,15 @@
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM загружен, инициализация...');
+    let currentRow = null;
+    let currentFilter = 'all';
 
-    // ========================
-    // 1. Данные о продуктах
-    // ========================
+    const productModal =
+        new bootstrap.Modal(
+            document.getElementById('productCatalogModal')
+        );
+
+
     const productsData = {
         {% for product in products %}
         {{ product.id }}: {
@@ -318,14 +383,12 @@ document.addEventListener('DOMContentLoaded', function() {
             name: "{{ product.name|escapejs }}",
             price: {{ product.unit_cost }},
             type: "{{ product.product_type }}",
+            stock: {{ product.quantity_in_stock|default:0 }},
             image: "{% if product.image %}{{ product.image.url }}{% endif %}"
         },
         {% endfor %}
     };
 
-    // ========================
-    // 2. Данные о клиентах (Customer)
-    // ========================
     const customersData = [
         {% for customer in customers %}
         {
@@ -335,11 +398,7 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         {% endfor %}
     ];
-    console.log('Клиентов загружено:', customersData.length);
 
-    // ========================
-    // 3. Данные о транспорте (Transport)
-    // ========================
     let transportsData = [
         {% for transport in transports %}
         {
@@ -352,69 +411,10 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         {% endfor %}
     ];
-    console.log('Транспорта загружено:', transportsData.length);
 
-    // ========================
-    // 4. Функция поиска TOTAL_FORMS (для formset)
-    // ========================
-    function getTotalFormsField() {
-        let field = document.getElementById('id_order_items-TOTAL_FORMS');
-        if (field) return field;
-        field = document.getElementById('id_items-TOTAL_FORMS');
-        if (field) return field;
-        field = document.getElementById('id_TOTAL_FORMS');
-        if (field) return field;
-        field = document.querySelector('[name$="TOTAL_FORMS"]');
-        if (field) return field;
-        field = document.querySelector('input[name*="TOTAL_FORMS"], select[name*="TOTAL_FORMS"]');
-        return field;
-    }
 
-    // ========================
-    // 5. Функции для Select2 (товары) — без изменений
-    // ========================
-    function formatProductOption(product) {
-        if (!product.id) return product.text;
-        const productData = productsData[product.id];
-        if (!productData) return product.text;
-
-        const hasImage = productData.image && productData.type === 'part';
-        let imageHtml = hasImage
-            ? `<img src="${productData.image}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px; margin-right: 10px;">`
-            : `<div style="width: 40px; height: 40px; background-color: #f8f9fa; border-radius: 4px; margin-right: 10px;"></div>`;
-
-        return $(`
-            <div class="d-flex align-items-center">
-                ${imageHtml}
-                <div><strong>${escapeHtml(productData.name)}</strong><div class="small text-muted">${productData.type === 'part' ? 'Запчасть' : 'Услуга'}</div></div>
-            </div>
-        `);
-    }
-
-    function formatSelectedOption(option) {
-        const productId = option.id;
-        if (!productId) return option.text;
-        const productData = productsData[productId];
-        if (!productData) return option.text;
-
-        const hasImage = productData.image && productData.type === 'part';
-        let imageHtml = hasImage
-            ? `<img src="${productData.image}" style="width: 24px; height: 24px; object-fit: cover; border-radius: 3px; margin-right: 8px;">`
-            : `<span style="width: 24px; height: 24px; display: inline-block; margin-right: 8px;"></span>`;
-
-        return $(`<div class="d-flex align-items-center">${imageHtml}<span>${escapeHtml(productData.name)}</span></div>`);
-    }
-
-    function escapeHtml(str) {
-        if (!str) return '';
-        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    }
-
-    // ========================
-    // 6. Функции обновления строк заказа (товары)
-    // ========================
     function updateRow(row) {
-        const select = row.querySelector('.product-select');
+        const productInput = row.querySelector('.product-id-input');
         const quantityInput = row.querySelector('.quantity-input');
         const priceDisplay = row.querySelector('.price-display');
         const subtotalDisplay = row.querySelector('.subtotal-display');
@@ -422,13 +422,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (!priceDisplay || !subtotalDisplay || !typeBadge) return;
 
-        if (!select || !select.value) {
+        if (!productInput || !productInput.value) {
             resetRowDisplay(priceDisplay, subtotalDisplay, typeBadge);
             updateTotal();
             return;
         }
 
-        const product = productsData[select.value];
+        const product = productsData[productInput.value];
         if (!product) {
             resetRowDisplay(priceDisplay, subtotalDisplay, typeBadge);
             updateTotal();
@@ -468,38 +468,33 @@ document.addEventListener('DOMContentLoaded', function() {
         if (totalSpan) totalSpan.textContent = total.toFixed(2);
     }
 
-    // ========================
-    // 7. Инициализация товаров в строке
-    // ========================
-    function initSelect2ForRow(row) {
-        const selectEl = row.querySelector('.product-select');
-        if (!selectEl) return;
-        if ($(selectEl).data('select2')) $(selectEl).select2('destroy');
-        const isMobile = window.innerWidth <= 768;
-        $(selectEl).select2({
-            theme: 'bootstrap-5',
-            width: '100%',
-            dropdownParent: isMobile ? $('body') : row.closest('form'),
-            templateResult: formatProductOption,
-            templateSelection: formatSelectedOption
-        });
-
-        const selectedValue = selectEl.getAttribute('data-product-id');
-        if (selectedValue) {
-            $(selectEl).val(selectedValue).trigger('change');
-        }
-
-        $(selectEl).on('change', () => updateRow(row));
-
-        setTimeout(() => updateRow(row), 50);
-    }
-
     function bindRowEvents(row) {
-        const select = row.querySelector('.product-select');
         const quantity = row.querySelector('.quantity-input');
         const removeBtn = row.querySelector('.remove-row');
+        const picker =
+            row.querySelector('.product-picker');
 
-        if (select) initSelect2ForRow(row);
+        if(picker){
+            picker.removeEventListener(
+                'click',
+                row._pickerHandler
+            );
+            row._pickerHandler = () => {
+                currentRow = row;
+                renderCatalog();
+                productModal.show();
+                setTimeout(() => {
+                    document
+                        .getElementById('catalog-search')
+                        .focus();
+                },300);
+            };
+            picker.addEventListener(
+                'click',
+                row._pickerHandler
+            );
+        }
+
         if (quantity) {
             quantity.removeEventListener('input', row._quantityHandler);
             row._quantityHandler = () => updateRow(row);
@@ -508,46 +503,97 @@ document.addEventListener('DOMContentLoaded', function() {
         if (removeBtn) {
             removeBtn.removeEventListener('click', row._removeHandler);
             row._removeHandler = () => {
-                if (select && $(select).data('select2')) $(select).select2('destroy');
                 row.remove();
                 updateTotal();
-                updateFormsetIndexes();
             };
             removeBtn.addEventListener('click', row._removeHandler);
         }
         updateRow(row);
     }
 
-    function updateFormsetIndexes() {
-        const rows = document.querySelectorAll('#items-tbody .item-row');
-        const totalFormsField = getTotalFormsField();
-        if (totalFormsField) totalFormsField.value = rows.length;
+    function renderCatalog(search=''){
+        const container =
+            document.getElementById('catalog-list');
 
-        rows.forEach((row, idx) => {
-            row.dataset.index = idx;
-            const select = row.querySelector('.product-select');
-            if (select) {
-                const selectName = select.getAttribute('name');
-                const selectId = select.getAttribute('id');
-                if (selectName) select.setAttribute('name', selectName.replace(/items-\d+-/, `items-${idx}-`));
-                if (selectId) select.setAttribute('id', selectId.replace(/items-\d+-/, `items-${idx}-`));
+        container.innerHTML='';
+        const products = Object.values(productsData)
+        .sort((a, b) => {
+            if (a.type !== b.type) {
+                return a.type.localeCompare(b.type);
             }
-            const quantity = row.querySelector('.quantity-input');
-            if (quantity) {
-                const qName = quantity.getAttribute('name');
-                const qId = quantity.getAttribute('id');
-                if (qName) quantity.setAttribute('name', qName.replace(/items-\d+-/, `items-${idx}-`));
-                if (qId) quantity.setAttribute('id', qId.replace(/items-\d+-/, `items-${idx}-`));
+            return a.name.localeCompare(b.name);
+        });
+
+        products.forEach(product => {
+            if(
+                currentFilter !== 'all' &&
+                product.type !== currentFilter
+            ){
+                return;
             }
+            if(
+                search &&
+                !product.name
+                    .toLowerCase()
+                    .includes(search.toLowerCase())
+            ){
+                return;
+            }
+            const imageHtml =
+                product.image
+                ? `<img src="${product.image}"
+                        class="catalog-image">`
+                : `<div class="catalog-placeholder"></div>`;
+            const stockHtml =
+                product.type === 'part'
+                ? `<div class="catalog-stock">
+                      Остаток: ${product.stock}
+                   </div>`
+                : '';
+
+            const item =
+                document.createElement('div');
+
+            item.className='catalog-item';
+            item.innerHTML=`
+                ${imageHtml}
+                <div class="flex-grow-1">
+                    <div class="fw-bold">
+                        ${product.name}
+                    </div>
+                    <div class="text-muted">
+                        ${
+                            product.type==='part'
+                            ? 'Запчасть'
+                            : 'Услуга'
+                        }
+
+                    </div>
+                    ${stockHtml}
+                </div>
+                <div class="catalog-price">
+
+                    ${product.price} ₽
+
+                </div>
+            `;
+            item.onclick=()=>selectProduct(product);
+            container.appendChild(item);
         });
     }
 
-    // ========================
-    // 8. Добавление новой строки товара
-    // ========================
+    function selectProduct(product){
+        const input = currentRow.querySelector('.product-id-input');
+        input.value = product.id;
+        const picker = currentRow.querySelector('.product-picker');
+        renderSelectedProduct(currentRow, product);
+        updateRow(currentRow);
+        productModal.hide();
+    }
+
     function addNewRow() {
         const tbody = document.getElementById('items-tbody');
-        const totalFormsField = getTotalFormsField();
+        const totalFormsField = document.getElementById('id_order_items-TOTAL_FORMS');
         if (!tbody || !totalFormsField) return;
 
         const formNum = parseInt(totalFormsField.value);
@@ -563,20 +609,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (el.hasAttribute('id')) el.setAttribute('id', el.getAttribute('id').replace(/__prefix__/g, formNum));
         });
 
-        const select = newRow.querySelector('.product-select');
-        if (select) {
-            select.innerHTML = '<option value="">---------</option>';
-            for (const [id, product] of Object.entries(productsData)) {
-                const option = document.createElement('option');
-                option.value = id;
-                option.textContent = product.name;
-                option.dataset.price = product.price;
-                option.dataset.type = product.type;
-                option.dataset.name = product.name;
-                if (product.image) option.dataset.image = product.image;
-                select.appendChild(option);
-            }
-        }
 
         newRow.dataset.index = formNum;
         tbody.appendChild(newRow);
@@ -584,7 +616,55 @@ document.addEventListener('DOMContentLoaded', function() {
         bindRowEvents(newRow);
         newRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-    /// Form
+
+    function renderSelectedProduct(row, product){
+        const picker =
+            row.querySelector('.product-picker');
+        if (!picker) return;
+        picker.innerHTML = `
+            <div class="selected-product">
+                ${
+                    product.image
+                    ? `<img src="${product.image}">`
+                    : ''
+                }
+                <div>
+                    <div>${product.name}</div>
+                    <small class="text-muted">
+                        ${product.price} ₽
+                    </small>
+                </div>
+            </div>
+        `;;
+    }
+
+    function normalizeFormset() {
+        const rows = Array.from(
+            document.querySelectorAll('#items-tbody .item-row')
+        ).filter(row => {
+            const input = row.querySelector('.product-id-input');
+            return input && input.value;
+        });
+        rows.forEach((row, index) => {
+            row.querySelectorAll('[name]').forEach(el => {
+                el.name = el.name.replace(
+                    /order_items-\d+-/,
+                    `order_items-${index}-`
+                );
+            });
+            row.querySelectorAll('[id]').forEach(el => {
+                el.id = el.id.replace(
+                    /order_items-\d+-/,
+                    `order_items-${index}-`
+                );
+            });
+        });
+
+        document.getElementById(
+            'id_order_items-TOTAL_FORMS'
+        ).value = rows.length;
+    }
+
     const $customer = $('#customer_select2');
     const $transport = $('#transport_select2');
     const initialCustomerId = "{{ initial_customer }}";
@@ -658,7 +738,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         $transport.prop('disabled', false);
 
-        // 👉 ВАЖНО: ставим значение ПОСЛЕ заполнения
         if (selectedTransportId) {
             $transport.val(selectedTransportId);
         }
@@ -681,7 +760,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-
     $(document).on('click', '#add-customer-btn', function (e) {
         e.preventDefault();
 
@@ -699,11 +777,46 @@ document.addEventListener('DOMContentLoaded', function() {
             "{% url 'create_transport' %}" + `?customer_id=${customerId}&next=${encodeURIComponent(cleanUrl+ "?customer=" + customerId)}`;
     });
 
+    document.querySelectorAll('.item-row')
+    .forEach(row => {
+        const productInput = row.querySelector('.product-id-input');
+        if (!productInput.value) return;
+        const product =
+            productsData[productInput.value];
+        if (product) {
+            renderSelectedProduct(row, product);
+            updateRow(row);
+        }
+    });
+
+    document.getElementById('catalog-search')
+    .addEventListener('input', e => {
+
+        renderCatalog(e.target.value);
+
+    });
+    document.querySelectorAll('.catalog-filter')
+    .forEach(btn=>{
+        btn.addEventListener('click',()=>{
+            document.querySelectorAll('.catalog-filter')
+            .forEach(b=>{
+                b.classList.remove('active');
+                b.classList.remove('btn-primary');
+                b.classList.add('btn-outline-primary');
+            });
+            btn.classList.add('active');
+            btn.classList.add('btn-primary');
+            currentFilter = btn.dataset.filter;
+            renderCatalog(
+                document.getElementById(
+                    'catalog-search'
+                ).value
+            );
+        });
+    });
+
     initCustomerSelect2();
     updateTransportList(initialCustomerId, initialTransportId);
-    // ========================
-    // 11. Инициализация страницы (товары, кнопка добавления)
-    // ========================
     document.querySelectorAll('#items-tbody .item-row').forEach(row => bindRowEvents(row));
 
     const addBtn = document.getElementById('add-item-btn');
@@ -719,13 +832,14 @@ document.addEventListener('DOMContentLoaded', function() {
         orderForm.addEventListener('submit', (e) => {
             let hasItems = false;
             document.querySelectorAll('#items-tbody .item-row').forEach(row => {
-                const select = row.querySelector('.product-select');
-                if (select && select.value) hasItems = true;
+                const input = row.querySelector('.product-id-input');
+                if (input && input.value) hasItems = true;
             });
             if (!hasItems) {
                 e.preventDefault();
                 alert('Добавьте хотя бы одну позицию в заказ');
             }
+            normalizeFormset();
         });
     }
 });

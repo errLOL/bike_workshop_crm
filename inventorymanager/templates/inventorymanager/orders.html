@@ -232,6 +232,8 @@
                                 <span class="status-badge bg-success text-white">✅ Готов</span>
                             {% elif order.status == 'accepted' %}
                                 <span class="status-badge bg-primary text-white">🆕 Новый</span>
+                            {% elif order.status == 'cancelled' %}
+                                <span class="status-badge bg-danger text-white">Отменен</span>
                             {% else %}
                                 <span class="status-badge bg-secondary">📁 Выдан</span>
                             {% endif %}

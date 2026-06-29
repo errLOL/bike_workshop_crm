@@ -161,6 +161,8 @@
                                 <span class="status-badge bg-success text-white">✅ Готов</span>
                             {% elif order.status == 'accepted' %}
                                 <span class="status-badge bg-primary text-white">🆕 Новый</span>
+                            {% elif order.status == 'cancelled' %}
+                                <span class="status-badge bg-danger text-white">Отменен</span>
                             {% else %}
                                 <span class="status-badge bg-secondary">📁 Выдан</span>
                             {% endif %}
@@ -246,9 +248,8 @@
                 <i class="fas fa-camera me-2"></i>Фото транспорта
             </div>
             <div class="card-body">
-                <!-- Область для загрузки / камера -->
                 <div class="upload-area mb-4" id="uploadArea">
-                    <input type="file" id="photoInput" accept="image/*" capture="environment" style="display: none;">
+                    <input type="file" id="photoInput" accept="image/*" style="display: none;">
                     <div class="text-center p-4 border rounded-3 bg-light" style="cursor: pointer; transition: all 0.2s;" id="uploadTrigger">
                         <i class="fas fa-camera fa-3x text-primary mb-2"></i>
                         <div class="fw-bold">Сделать фото или загрузить</div>

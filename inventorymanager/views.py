@@ -1090,15 +1090,16 @@ def create_product(request):
 
 @login_required
 def order_list(request):
-    orders = Order.objects.select_related(
+    orders = (Order.objects.select_related(
         'customer',
         'transport',
         'employee'
-    ).prefetch_related(
+    )
+    .prefetch_related(
         'order_items__product'
     ).annotate(
         total_value=Sum(F('order_items__quantity') * F('order_items__unit_price'))
-    ).order_by('-created_at')
+    ).order_by('-created_at'))
 
     # Поиск по номеру заказа, клиенту, транспорту или серийному номеру
     search_query = request.GET.get('search', '')
@@ -1114,6 +1115,8 @@ def order_list(request):
     status = request.GET.get('status', '')
     if status:
         orders = orders.filter(status=status)
+    else:
+        orders = orders.exclude(status=("issued", "cancelled"))
 
     # Фильтр по дате (от)
     date_from = request.GET.get('date_from', '')
@@ -1127,10 +1130,8 @@ def order_list(request):
 
     # Фильтр по технику
     employee = request.GET.get('employee', '')
-    print(employee)
     if employee:
         orders = orders.filter(employee=employee)
-
     # Статистика для виджетов
     total_orders = Order.objects.count()
     accepted_count = Order.objects.filter(status='accepted').count()
@@ -1195,7 +1196,7 @@ def create_order(request):
                 employee_id = request.POST.get('employee')
                 if not customer_id or not transport_id:
                     messages.error(request, 'Выберите клиента' if not customer_id else 'Выберите технику')
-                    return render(request, 'inventory/createOrder.html', {
+                    return render(request, 'inventorymanager/createOrder.html', {
                                                                             'form': form,
                                                                             'formset': formset,
                                                                             'products': products,
