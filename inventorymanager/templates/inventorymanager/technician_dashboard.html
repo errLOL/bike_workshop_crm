@@ -220,7 +220,7 @@
                                     </div>
                                 </div>
                                 <div class="text-end">
-                                    <div class="fw-bold">{{ order.total_amount|floatformat:2 }} ₽</div>
+                                    <div class="fw-bold">{{ order.total|floatformat:2 }} ₽</div>
                                     <div class="small text-muted">{{ order.created_at|date:"d.m.Y" }}</div>
                                     <div class="small text-muted">{{ order.created_at|date:"H:i" }}</div>
                                 </div>
@@ -318,7 +318,7 @@
                             <td>{{ order.customer.name|default:"—" }}</td>
                             <td>{{ order.transport.name|default:"—" }}</td>
                             <td>{{ order.created_at|date:"d.m.Y" }}</td>
-                            <td class="fw-bold">{{ order.total_amount|floatformat:2 }} ₽</td>
+                            <td class="fw-bold">{{ order.total|floatformat:2 }} ₽</td>
                             <td class="text-success">{{ order.technician_earnings|floatformat:2 }} ₽</td>
                             <td>
                                 <a href="{% url 'order_detail' order.id %}" class="btn btn-sm btn-outline-primary">

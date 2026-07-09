@@ -175,3 +175,23 @@ def get_services_total(queryset):
         )['total']
         or 0
     )
+
+def calculate_formset_totals(formset):
+    services_total = Decimal("0.00")
+    parts_total = Decimal("0.00")
+
+    for item_form in formset:
+        if not item_form.cleaned_data or item_form.cleaned_data.get("DELETE"):
+            continue
+
+        product = item_form.cleaned_data["product"]
+        quantity = item_form.cleaned_data["quantity"]
+
+        subtotal = product.unit_cost * quantity
+
+        if product.product_type == "service":
+            services_total += Decimal(subtotal)
+        else:
+            parts_total += Decimal(subtotal)
+
+    return services_total, parts_total

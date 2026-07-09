@@ -1,7 +1,9 @@
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
 from django.db import models, transaction
-from django.db.models import F, Sum
+from django.db.models import F, Sum, DecimalField
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.urls import reverse
@@ -136,10 +138,64 @@ class Order(BaseModel):
         null=True,
         verbose_name='Причина обращения'
     )
+    service_discount = models.DecimalField(
+        "Скидка на работы",
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal("0.00")
+    )
+
+    parts_discount = models.DecimalField(
+        "Скидка на запчасти",
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal("0.00")
+    )
     completed_at = models.DateTimeField(null=True, blank=True, verbose_name='Дата завершения')
 
-    def total_amount(self):
-        return sum(item.subtotal() for item in self.order_items.all())
+    @property
+    def services_total(self):
+        return (
+            self.order_items
+            .filter(product__product_type='service')
+            .aggregate(
+                total=Sum(
+                    F('quantity') * F('unit_price'),
+                    output_field=DecimalField()
+                )
+            )['total']
+            or Decimal("0")
+        )
+
+    @property
+    def parts_total(self):
+        return (
+            self.order_items
+            .filter(product__product_type='part')
+            .aggregate(
+                total=Sum(
+                    F('quantity') * F('unit_price'),
+                    output_field=DecimalField()
+                )
+            )['total']
+            or Decimal("0")
+        )
+
+    @property
+    def services_total_after_discount(self):
+        return max(Decimal("0"),self.services_total - self.service_discount)
+
+    @property
+    def parts_total_after_discount(self):
+        return max(Decimal("0"), self.parts_total - self.parts_discount)
+
+    @property
+    def total(self):
+        return self.services_total_after_discount + self.parts_total_after_discount
+
+    @property
+    def total_discount(self):
+        return self.service_discount + self.parts_discount
 
     @property
     def total_paid(self):
@@ -149,7 +205,7 @@ class Order(BaseModel):
     @property
     def debt(self):
         """Текущий долг клиента"""
-        return self.total_amount() - self.total_paid
+        return self.total - self.total_paid
 
     @property
     def payment_status(self):
@@ -186,6 +242,24 @@ class Order(BaseModel):
                 cash_register=cash_register
             )
             return payment
+
+    def clean(self):
+        if self.service_discount < 0:
+            raise ValidationError({
+                'service_discount': 'Скидка не может быть отрицательной.'
+            })
+        if self.parts_discount < 0:
+            raise ValidationError({
+                'parts_discount': 'Скидка не может быть отрицательной.'
+            })
+        if self.service_discount > self.services_total:
+            raise ValidationError({
+                'service_discount': 'Скидка превышает стоимость работ.'
+            })
+        if self.parts_discount > self.parts_total:
+            raise ValidationError({
+                'parts_discount': 'Скидка превышает стоимость запчастей.'
+            })
 
     def __str__(self):
         transport_info = f" - {self.transport.name}" if self.transport else ""

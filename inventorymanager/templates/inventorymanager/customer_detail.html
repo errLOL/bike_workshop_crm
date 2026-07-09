@@ -195,7 +195,7 @@
                                     <td>#{{ order.id }}</td>
                                     <td>{{ order.created_at|date:"d.m.Y" }}</td>
                                     <td>{{ order.transport.name|default:"—" }}</td>
-                                    <td class="fw-bold">{{ order.total_amount|floatformat:2 }} ₽</td>
+                                    <td class="fw-bold">{{ order.total|floatformat:2 }} ₽</td>
                                     <td>
                                         {% if order.status == 'in_work' %}
                                             <span class="badge bg-info ">🔄 В работе</span>

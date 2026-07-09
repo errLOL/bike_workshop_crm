@@ -150,6 +150,12 @@
                         <div class="info-label">Дата создания:</div>
                         <div class="info-value">{{ order.created_at|date:"d.m.Y H:i" }}</div>
                     </div>
+                    {% if order.status == 'issued' %}
+                    <div class="info-row">
+                        <div class="info-label">Дата завершения:</div>
+                        <div class="info-value">{{ order.completed_at|date:"d.m.Y H:i" }}</div>
+                    </div>
+                    {% endif %}
                     <div class="info-row">
                         <div class="info-label">Статус:</div>
                         <div class="info-value">
@@ -329,7 +335,7 @@
                 <div class="card-body">
                     <div class="info-row">
                         <div class="info-label">Сумма заказа:</div>
-                        <div class="info-value"><strong>{{ order.total_amount|floatformat:2 }} ₽</strong></div>
+                        <div class="info-value"><strong>{{ order.total|floatformat:2 }} ₽</strong></div>
                     </div>
                     <div class="info-row">
                         <div class="info-label">Оплачено:</div>
@@ -439,9 +445,15 @@
                             </tbody>
                             <tfoot>
                                 <tr class="total-row">
+                                    <td colspan="5" class="text-end fs-6 fw-light">Скидка:</td>
+                                    <td class="text-end">
+                                        -{{ order.total_discount|floatformat:2|default:0 }} ₽
+                                     </td>
+                                 </tr>
+                                <tr class="table-active total-row">
                                     <td colspan="5" class="text-end fw-bold">Итого:</td>
-                                    <td class="text-end fw-bold text-primary fs-5">
-                                        {{ order.total_amount|floatformat:2 }} ₽
+                                    <td class="text-end fw-bold text-primary fs-4">
+                                        {{ order.total|floatformat:2 }} ₽
                                      </td>
                                  </tr>
                             </tfoot>
@@ -567,7 +579,7 @@
                 <div class="modal-body">
                     <div class="alert alert-info d-flex justify-content-between mb-3">
                         <span>Сумма заказа:</span>
-                        <strong>{{ order.total_amount|floatformat:2 }} ₽</strong>
+                        <strong>{{ order.total|floatformat:2 }} ₽</strong>
                     </div>
                     <div class="alert alert-warning d-flex justify-content-between mb-3">
                         <span>Остаток к оплате:</span>

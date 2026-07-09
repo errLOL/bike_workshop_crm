@@ -243,7 +243,7 @@
                     <!-- Сумма и позиции -->
                     <div class="col-md-3">
                         <div class="order-total">
-                            {{ order.total_value|floatformat:2 }} ₽
+                            {{ order.total|floatformat:2 }} ₽
                         </div>
                         <div class="order-meta">
                             <i class="fas fa-boxes me-1"></i>{{ order.order_items.count }} позиций

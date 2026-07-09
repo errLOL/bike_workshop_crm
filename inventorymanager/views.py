@@ -19,7 +19,8 @@ from .forms import *
 from django.db.models import Sum, F, Q, Count, Avg, ExpressionWrapper, DecimalField
 import json
 
-from .utils import calculate_all_technicians_salary, calculate_technician_salary, get_period_range, get_services_total
+from .utils import calculate_all_technicians_salary, calculate_technician_salary, get_period_range, get_services_total, \
+    calculate_formset_totals
 
 
 def log_action(request, action_type, model_name, object_id, object_repr, changes=None):
@@ -80,9 +81,9 @@ def admin_dashboard(request):
 
         # Top Selling Products Chart
         top_selling_products = (
-            OrderItem.objects.values("product__name")
+            OrderItem.objects.filter(product__product_type='part').values("product__name")
             .annotate(total_quantity_sold=Sum("quantity"))
-            .order_by("-total_quantity_sold")[:3]
+            .order_by("-total_quantity_sold")[:10]
         )
         tps_chart_labels = [item["product__name"] for item in top_selling_products]
         tps_chart_data = [item["total_quantity_sold"] for item in top_selling_products]
@@ -125,7 +126,7 @@ def admin_dashboard(request):
                 "order__customer__name", "order__customer__phone"
             )
             .annotate(total_spending=Sum(F("quantity") * F("unit_price")))
-            .order_by("-total_spending")[:3]
+            .order_by("-total_spending")[:5]
         )
 
         customer_orders_labels = [
@@ -186,11 +187,11 @@ def admin_dashboard(request):
 
 @login_required
 def technician_dashboard(request):
-    """Дашборд техника — активные заказы и быстрая статистика"""
+
     user = request.user
     salary_percent = 40
 
-    # Быстрая статистика за сегодня/неделю (маленький виджет)
+
     today = timezone.now().replace(hour=0, minute=0, second=0)
 
     # Выручка от услуг за сегодня
@@ -244,7 +245,7 @@ def technician_dashboard(request):
     for order in my_completed_orders:
 
         order.technician_earnings = (
-            (order.services_total or 0)
+            order.services_total_after_discount
             * Decimal(salary_percent / 100)
         )
 
@@ -343,7 +344,7 @@ def salary_report(request):
 
     # Получаем список всех техников
     technicians = User.objects.filter(
-        Q(is_superuser=True) | Q(groups__name='Technician')
+        Q(is_superuser=True) | Q(groups__name='Technician') & Q(is_active = True)
     ).distinct().order_by('first_name', 'username')
 
     # Получаем процент каждого техника (для графика)
@@ -1116,7 +1117,7 @@ def order_list(request):
     if status:
         orders = orders.filter(status=status)
     else:
-        orders = orders.exclude(status=("issued", "cancelled"))
+        orders = orders.exclude(status__in=("issued", "cancelled"))
 
     # Фильтр по дате (от)
     date_from = request.GET.get('date_from', '')
@@ -1181,7 +1182,7 @@ def create_order(request):
     transports = Transport.objects.select_related('customer').all().order_by('-created_at')
     User = get_user_model()
     technicians = User.objects.filter(
-        Q(is_superuser=True) | Q(groups__name='Technician')
+        Q(is_superuser=True) | Q(groups__name='Technician') & Q(is_active=True)
     ).distinct().order_by('first_name', 'username')
 
     if request.method == 'POST':
@@ -1194,24 +1195,46 @@ def create_order(request):
                 customer_id = initial_customer
                 transport_id = initial_transport
                 employee_id = request.POST.get('employee')
+                context = {'form': form,
+                            'formset': formset,
+                            'products': products,
+                            'customers': customers,
+                            'transports': transports,
+                            'initial_customer': initial_customer or '',
+                            'initial_transport': transport_id or '',
+                            'title': 'Создание заказа',
+                        }
                 if not customer_id or not transport_id:
                     messages.error(request, 'Выберите клиента' if not customer_id else 'Выберите технику')
-                    return render(request, 'inventorymanager/createOrder.html', {
-                                                                            'form': form,
-                                                                            'formset': formset,
-                                                                            'products': products,
-                                                                            'customers': customers,
-                                                                            'transports': transports,
-                                                                            'initial_customer': initial_customer or '',
-                                                                            'initial_transport': transport_id or '',
-                                                                            'title': 'Создание заказа',
-                                                                        })
+                    return render(request, 'inventorymanager/order_form.html', context)
 
                 customer = get_object_or_404(Customer, id=customer_id)
                 transport = get_object_or_404(Transport, id=transport_id)
                 order = form.save(commit=False)
                 order.customer = customer
                 order.transport = transport
+                order.service_discount = Decimal(
+                    request.POST.get('service_discount') or 0
+                )
+                order.parts_discount = Decimal(
+                    request.POST.get('parts_discount') or 0
+                )
+                services_total, parts_total = calculate_formset_totals(formset)
+
+                if order.service_discount > services_total:
+                    messages.error(
+                        request,
+                        "Скидка превышает стоимость работ."
+                    )
+                    return render(request, 'inventorymanager/order_form.html', context)
+
+                if order.parts_discount > parts_total:
+                    messages.error(
+                        request,
+                        "Скидка превышает стоимость запчастей."
+                    )
+                    return render(request, 'inventorymanager/order_form.html', context)
+
                 if employee_id:
                     order.employee_id = employee_id
                 else:
@@ -1219,7 +1242,7 @@ def create_order(request):
                 order.description = request.POST.get('description', '')
                 order.save()
 
-                # Сохраняем позиции заказа (OrderItem)
+
                 for item_form in formset:
                     if item_form.cleaned_data and not item_form.cleaned_data.get('DELETE', False):
                         product = item_form.cleaned_data['product']
@@ -1264,7 +1287,7 @@ def create_order(request):
         'initial_transport': initial_transport or '',
         'title': 'Создание заказа',
     }
-    return render(request, 'inventorymanager/createOrder.html', context)
+    return render(request, 'inventorymanager/order_form.html', context)
 
 
 @login_required
@@ -1467,53 +1490,54 @@ def edit_order(request, order_id):
             try:
                 with transaction.atomic():
                     if order.status in ('in_work', 'ready'):
-
                         new_items = {}
-
                         for form_item in formset.forms:
-
                             if form_item.cleaned_data.get('DELETE'):
                                 continue
 
                             product = form_item.cleaned_data.get('product')
                             quantity = form_item.cleaned_data.get('quantity')
-
-                            if (
-                                product and
-                                quantity and
-                                product.product_type == 'part'
-                            ):
+                            if product and quantity and product.product_type == 'part':
                                 new_items[product.id] = quantity
 
                         all_ids = set(old_items.keys()) | set(new_items.keys())
                         for product_id in all_ids:
                             old_qty = old_items.get(product_id, 0)
                             new_qty = new_items.get(product_id, 0)
-
                             diff = new_qty - old_qty
                             if diff <= 0:
                                 continue
                             product = Product.objects.select_for_update().get(id=product_id)
 
                             if product.quantity_in_stock < diff:
-
                                 messages.error(
                                     request,
                                     f'Недостаточно "{product.name}". '
                                     f'Доступно: {product.quantity_in_stock}, нужно: {diff}'
                                 )
-
-                                # rollback transaction
                                 transaction.set_rollback(True)
-
                                 return redirect('order_detail', order_id=order.id)
 
                     order = form.save(commit=False)
-
                     customer_id = request.POST.get('customer')
                     transport_id = request.POST.get('transport')
                     employee_id = request.POST.get('employee')
                     order.description = request.POST.get('description', '')
+                    order.service_discount = Decimal(
+                        request.POST.get('service_discount') or 0
+                    )
+                    order.parts_discount = Decimal(
+                        request.POST.get('parts_discount') or 0
+                    )
+                    services_total, parts_total = calculate_formset_totals(formset)
+                    if order.service_discount > services_total:
+                        messages.error(request, "Скидка превышает стоимость работ.")
+                        return redirect('order_detail', order_id=order.id)
+
+                    if order.parts_discount > parts_total:
+                        messages.error(request,"Скидка превышает стоимость запчастей.")
+                        return redirect('order_detail', order_id=order.id)
+
                     if customer_id:
                         order.customer_id = customer_id
                     if transport_id:
@@ -1527,7 +1551,6 @@ def edit_order(request, order_id):
                     formset.save()
 
                     if order.status in ('in_work', 'ready'):
-
                         new_items = {
                             item.product_id: item.quantity
                             for item in order.order_items.select_related('product').all()
@@ -1537,10 +1560,8 @@ def edit_order(request, order_id):
                         all_ids = set(old_items.keys()) | set(new_items.keys())
 
                         for product_id in all_ids:
-
                             old_qty = old_items.get(product_id, 0)
                             new_qty = new_items.get(product_id, 0)
-
                             diff = new_qty - old_qty
 
                             if diff == 0:
@@ -1582,13 +1603,16 @@ def edit_order(request, order_id):
         form = OrderForm(instance=order)
         formset = OrderItemFormSet(instance=order)
 
-    return render(request, 'inventorymanager/editOrder.html', {
+    return render(request, 'inventorymanager/order_form.html', {
+        'title': f'Редактирование заказа #{order.id}',
         'form': form,
         'formset': formset,
         'order': order,
         'customers': customers,
         'transports': transports,
         'technicians': technicians,
+        'initial_customer': order.customer.id or '',
+        'initial_transport': order.transport.id or '',
         'products': products,
     })
 
