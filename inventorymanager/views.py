@@ -478,8 +478,6 @@ def salary_report(request):
             order__completed_at__lt=end_date,
             product__product_type='service'
         ).aggregate(total=Sum(F('quantity') * F('unit_price')))['total'] or 0
-        print(tech)
-        print(f"Total: {services_total}")
 
         salary = services_total * Decimal(percent / 100)
 
@@ -489,7 +487,6 @@ def salary_report(request):
             completed_at__gte=start_date,
             completed_at__lt=end_date
         ).count()
-        print(f"orders count: {orders_count}")
 
         salary_data.append({
             'user': tech,

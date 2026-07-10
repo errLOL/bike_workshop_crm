@@ -252,14 +252,7 @@ class Order(BaseModel):
             raise ValidationError({
                 'parts_discount': 'Скидка не может быть отрицательной.'
             })
-        if self.service_discount > self.services_total:
-            raise ValidationError({
-                'service_discount': 'Скидка превышает стоимость работ.'
-            })
-        if self.parts_discount > self.parts_total:
-            raise ValidationError({
-                'parts_discount': 'Скидка превышает стоимость запчастей.'
-            })
+
 
     def __str__(self):
         transport_info = f" - {self.transport.name}" if self.transport else ""
