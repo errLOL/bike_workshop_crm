@@ -151,11 +151,11 @@
                         <div class="salary-label">
                             <i class="fas fa-ruble-sign me-1"></i>Выручка за сегодня
                         </div>
-                        <div class="salary-number">{{ today_services|floatformat:0 }} ₽</div>
-                        <div class="small mt-2 opacity-75">
-                            <i class="fas fa-calculator me-1"></i>Ваша зарплата:
-                            <strong>{{ today_salary|floatformat:0 }} ₽</strong>
-                        </div>
+                        <div class="salary-number">{{ today_salary|floatformat:0 }} ₽</div>
+<!--                        <div class="small mt-2 opacity-75">-->
+<!--                            <i class="fas fa-calculator me-1"></i>Ваша зарплата:-->
+<!--                            <strong>{{ today_salary|floatformat:0 }} ₽</strong>-->
+<!--                        </div>-->
                     </div>
                 </div>
                 <div class="progress mt-3" style="height: 8px;">
@@ -197,7 +197,7 @@
                     <h5 class="mb-0">
                         <i class="fas fa-tasks me-2 text-primary"></i>Мои активные заказы
                     </h5>
-                    <a href="{% url 'orders' %}?status=accepted&amp;status=in_work&amp;emploee={{user.id}}" class="btn btn-sm btn-link">
+                    <a href="{% url 'orders' %}?status=accepted&amp;status=in_work&amp;employee={{user.id}}" class="btn btn-sm btn-link">
                         Все активные <i class="fas fa-arrow-right ms-1"></i>
                     </a>
                 </div>
@@ -244,7 +244,7 @@
                     <h5 class="mb-0">
                         <i class="fas fa-clock me-2 text-warning"></i>Ожидают запчасти
                     </h5>
-                    <a href="{% url 'orders' %}?status=waiting_spareparts&amp;emploee={{user.id}}" class="btn btn-sm btn-link">
+                    <a href="{% url 'orders' %}?status=waiting_spareparts&amp;employee={{user.id}}" class="btn btn-sm btn-link">
                         Все ожидающие <i class="fas fa-arrow-right ms-1"></i>
                     </a>
                 </div>
@@ -292,7 +292,7 @@
             <h5 class="mb-0">
                 <i class="fas fa-check-circle me-2 text-success"></i>Недавние завершённые заказы
             </h5>
-            <a href="{% url 'orders' %}?status=issued&amp;emploee={{user.id}}" class="btn btn-sm btn-link">
+            <a href="{% url 'orders' %}?status=issued&amp;employee={{user.id}}" class="btn btn-sm btn-link">
                 Все завершённые <i class="fas fa-arrow-right ms-1"></i>
             </a>
         </div>
@@ -319,7 +319,7 @@
                             <td>{{ order.transport.name|default:"—" }}</td>
                             <td>{{ order.created_at|date:"d.m.Y" }}</td>
                             <td class="fw-bold">{{ order.total|floatformat:2 }} ₽</td>
-                            <td class="text-success">{{ order.technician_earnings|floatformat:2 }} ₽</td>
+                            <td class="text-success">{{ order.technician_salary|floatformat:2 }} ₽</td>
                             <td>
                                 <a href="{% url 'order_detail' order.id %}" class="btn btn-sm btn-outline-primary">
                                     <i class="fas fa-eye"></i>

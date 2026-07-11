@@ -19,8 +19,9 @@ from .forms import *
 from django.db.models import Sum, F, Q, Count, Avg, ExpressionWrapper, DecimalField
 import json
 
-from .utils import calculate_all_technicians_salary, calculate_technician_salary, get_period_range, get_services_total, \
-    calculate_formset_totals
+from .utils import get_period_range, get_services_total, \
+    calculate_formset_totals, get_technician_orders_with_salary, get_services_total_after_discount, \
+    get_completed_orders_count
 
 
 def log_action(request, action_type, model_name, object_id, object_repr, changes=None):
@@ -187,67 +188,29 @@ def admin_dashboard(request):
 
 @login_required
 def technician_dashboard(request):
-
     user = request.user
     salary_percent = 40
-
-
     today = timezone.now().replace(hour=0, minute=0, second=0)
+    today_services = get_services_total_after_discount(user, today, timezone.now())
 
-    # Выручка от услуг за сегодня
-    today_services = OrderItem.objects.filter(
-        order__employee=user,
-        order__status='issued',
-        order__completed_at__gte=today,
-        product__product_type='service'
-    ).aggregate(total=Sum(F('quantity') * F('unit_price')))['total'] or 0
 
-    # Мои активные заказы
     my_active_orders = Order.objects.filter(
         employee=user
     ).filter(
         Q(status='accepted') | Q(status='in_work')
     ).select_related('customer', 'transport').order_by('created_at')[:10]
 
-    # Заказы, ожидающие запчасти
     awaiting_parts = Order.objects.filter(
         employee=user,
         status='waiting_spareparts'
     ).select_related('customer', 'transport', 'employee').order_by('created_at')[:10]
 
-    # Завершенные заказы за неделю
     week_ago = timezone.now() - timedelta(days=7)
-    my_completed_orders = (
-        Order.objects
-        .filter(
-            employee=user,
-            status='issued',
-            completed_at__gte=week_ago
-        )
-        .annotate(
-            services_total=Sum(
-                ExpressionWrapper(
-                    F('order_items__quantity') *
-                    F('order_items__unit_price'),
-                    output_field=DecimalField()
-                ),
-                filter=Q(
-                    order_items__product__product_type='service'
-                )
-            )
-        )
-        .select_related(
-            'customer',
-            'transport'
-        )
+    my_completed_orders = get_technician_orders_with_salary(
+        technician=user,
+        start_date=week_ago,
+        salary_percent=salary_percent,
     )
-
-    for order in my_completed_orders:
-
-        order.technician_earnings = (
-            order.services_total_after_discount
-            * Decimal(salary_percent / 100)
-        )
 
     orders_qs = Order.objects.filter(
         employee=user
@@ -277,8 +240,8 @@ def technician_dashboard(request):
     )
 
     avg_order_value = (
-        completed_orders.aggregate(
-            avg=Avg('order_total')
+        get_technician_orders_with_salary(technician=user, salary_percent=salary_percent).aggregate(
+            avg=Avg('services_after_discount')
         )['avg']
         or 0
     )
@@ -363,7 +326,7 @@ def salary_report(request):
         selected_date
     )
 
-    # Рассчитываем start_date и end_date
+
     if period_type == 'week':
         period_label = f"Неделя {start_date.strftime('%d.%m')} - {end_date.strftime('%d.%m.%Y')}"
         chart_labels = []
@@ -375,20 +338,13 @@ def salary_report(request):
             day_end = day_start + timedelta(days=1) - timedelta(seconds=1)
             chart_labels.append(day_start.strftime('%a, %d.%m'))
 
-            day_services = OrderItem.objects.filter(
-                order__status='issued',
-                order__completed_at__gte=day_start,
-                order__completed_at__lt=end_date,
-                product__product_type='service'
-            ).aggregate(total=Sum(F('quantity') * F('unit_price')))['total'] or 0
+            day_services = get_services_total_after_discount(start_date=day_start, end_date=day_end)
 
             chart_services_data.append(float(day_services))
-            chart_salary_data.append(float(day_services))  # TODO: посчитать зарплату по техникам
+            chart_salary_data.append(float(day_services)*0.4)  # TODO: посчитать зарплату по техникам
 
     elif period_type == 'month':
         period_label = f"Месяц {start_date.strftime('%B %Y')}"
-
-        # Данные для графика по неделям
         days_in_month = (end_date - start_date).days + 1
         week_size = days_in_month // 4
         chart_labels = [f"{i+1}-я неделя" for i in range(4)]
@@ -402,21 +358,13 @@ def salary_report(request):
             else:
                 week_end = start_date + timedelta(days=(week_num + 1) * week_size - 1)
 
-            week_services = OrderItem.objects.filter(
-                order__status='issued',
-                order__completed_at__gte=week_start,
-                order__completed_at__lt=end_date,
-                product__product_type='service'
-            ).aggregate(total=Sum(F('quantity') * F('unit_price')))['total'] or 0
-
+            week_services = get_services_total_after_discount(start_date=week_start, end_date=week_end)
             chart_services_data.append(float(week_services))
-            chart_salary_data.append(float(week_services))
+            chart_salary_data.append(float(week_services)*0.4)
 
     elif period_type == 'quarter':
         quarter = (start_date.month - 1) // 3 + 1
         period_label = f"Квартал {quarter} {start_date.year}"
-
-        # Данные для графика по месяцам
         chart_labels = [f"{i+1} месяц" for i in range(3)]
         chart_services_data = []
         chart_salary_data = []
@@ -425,20 +373,13 @@ def salary_report(request):
             month_start = start_date + relativedelta(months=i)
             month_end = month_start + relativedelta(months=1) - timedelta(days=1)
 
-            month_services = OrderItem.objects.filter(
-                order__status='issued',
-                order__completed_at__gte=month_start,
-                order__completed_at__lt=end_date,
-                product__product_type='service'
-            ).aggregate(total=Sum(F('quantity') * F('unit_price')))['total'] or 0
+            month_services = get_services_total_after_discount(start_date=month_start, end_date=month_end)
 
             chart_services_data.append(float(month_services))
-            chart_salary_data.append(float(month_services))
+            chart_salary_data.append(float(month_services)*0.4)
 
     else:  # year
         period_label = f"Год {start_date.year}"
-
-        # Данные для графика по месяцам
         chart_labels = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек']
         chart_services_data = []
         chart_salary_data = []
@@ -450,15 +391,10 @@ def salary_report(request):
             else:
                 month_end = month_start.replace(month=i+2, day=1) - timedelta(days=1)
 
-            month_services = OrderItem.objects.filter(
-                order__status='issued',
-                order__completed_at__gte=month_start,
-                order__completed_at__lt=end_date,
-                product__product_type='service'
-            ).aggregate(total=Sum(F('quantity') * F('unit_price')))['total'] or 0
+            month_services = get_services_total_after_discount(start_date=month_start, end_date=month_end)
 
             chart_services_data.append(float(month_services))
-            chart_salary_data.append(float(month_services))
+            chart_salary_data.append(float(month_services)*0.4)
 
     # Собираем данные по каждому технику
     salary_data = []
@@ -466,46 +402,38 @@ def salary_report(request):
     total_salary_all = 0
     technician_services = {}  # для графика по техникам
 
-    print(start_date)
-    print(end_date)
     for tech in technicians:
         percent = technician_percents.get(tech.id, 40)
-        # Выручка от услуг за период
-        services_total = OrderItem.objects.filter(
-            order__employee=tech,
-            order__status='issued',
-            order__completed_at__gte=start_date,
-            order__completed_at__lt=end_date,
-            product__product_type='service'
-        ).aggregate(total=Sum(F('quantity') * F('unit_price')))['total'] or 0
+        services_total = get_services_total_after_discount(technician=tech,
+                                                           start_date=start_date,
+                                                           end_date=end_date)
 
         salary = services_total * Decimal(percent / 100)
-
-        orders_count = Order.objects.filter(
-            employee=tech,
-            status='issued',
-            completed_at__gte=start_date,
-            completed_at__lt=end_date
-        ).count()
-
+        orders_count = get_completed_orders_count(tech, start_date, end_date)
+        avg_order_value = (
+        get_technician_orders_with_salary(technician=tech,
+                                          start_date=start_date,
+                                          end_date=end_date,
+                                          salary_percent=percent).aggregate(
+                                            avg=Avg('services_after_discount'))['avg']or 0
+        )
         salary_data.append({
             'user': tech,
             'percent': percent,
             'services_total': services_total,
             'salary': salary,
             'orders_count': orders_count,
+            'avg_order_value': avg_order_value,
         })
 
         technician_services[tech.get_full_name() or tech.username] = float(services_total)
         total_services_all += services_total
         total_salary_all += salary
-    # Сортируем по зарплате
     salary_data.sort(key=lambda x: x['salary'], reverse=True)
 
     # Топ-5 техников для графика
     top_technicians = dict(sorted(technician_services.items(), key=lambda x: x[1], reverse=True)[:5])
 
-    avg_service_per_technician = total_services_all / len(technicians) if len(technicians) > 0 else 0
     total_orders = sum(
         row["orders_count"]
         for row in salary_data
@@ -593,7 +521,6 @@ def salary_report(request):
         'end_date': end_date,
         'avg_order_value': avg_order_value,
         'technicians_count': len(technicians),
-        'avg_service_per_technician': avg_service_per_technician,
         'available_weeks': available_weeks,
         'available_months': available_months,
         'available_quarters': available_quarters,
@@ -610,10 +537,8 @@ def salary_report(request):
 
 @login_required
 def my_salary(request):
-    """Детальная страница зарплаты техника с выбором периода и графиками"""
     user = request.user
     salary_percent = 40
-
     period_type = request.GET.get('period', 'month')  # week, month, quarter, year
     selected_date = request.GET.get('date')
     start_date, end_date = get_period_range(
@@ -664,15 +589,7 @@ def my_salary(request):
         for i in range(7):
             day_start = start_date + timedelta(days=i)
             day_end = day_start + timedelta(days=1)
-            day_services = get_services_total(
-                OrderItem.objects.filter(
-                    order__employee=user,
-                    order__status='issued',
-                    order__completed_at__gte=day_start,
-                    order__completed_at__lt=day_end,
-                    product__product_type='service'
-                )
-            )
+            day_services = get_services_total_after_discount(user, day_start, day_end)
             chart_services_data.append(float(day_services))
             chart_salary_data.append(
                 float(day_services * Decimal(salary_percent / 100))
@@ -684,11 +601,9 @@ def my_salary(request):
         week_size = max(days_in_month // 4, 1)
 
         for week_num in range(4):
-
             week_start = start_date + timedelta(
                 days=week_num * week_size
             )
-
             if week_num == 3:
                 week_end = end_date
             else:
@@ -696,54 +611,26 @@ def my_salary(request):
                     days=(week_num + 1) * week_size
                 )
 
-            week_services = get_services_total(
-                OrderItem.objects.filter(
-                    order__employee=user,
-                    order__status='issued',
-                    order__completed_at__gte=week_start,
-                    order__completed_at__lt=week_end,
-                    product__product_type='service'
-                )
-            )
-
+            week_services = get_services_total_after_discount(user, week_start, week_end)
             chart_services_data.append(float(week_services))
-
             chart_salary_data.append(
                 float(week_services * Decimal(salary_percent / 100))
             )
 
     elif period_type == 'quarter':
-        # Поквартальная детализация по месяцам
         for i in range(3):
             month_start = start_date + relativedelta(months=i)
             month_end = month_start + relativedelta(months=1)
-            month_services = get_services_total(
-                OrderItem.objects.filter(
-                    order__employee=user,
-                    order__status='issued',
-                    order__completed_at__gte=month_start,
-                    order__completed_at__lt=month_end,
-                    product__product_type='service'
-                )
-            )
+            month_services = get_services_total_after_discount(user, month_start, month_end)
             chart_services_data.append(float(month_services))
             chart_salary_data.append(
                 float(month_services * Decimal(salary_percent / 100))
             )
     else:
-        # Годовая детализация по месяцам
         for i in range(12):
             month_start = start_date + relativedelta(months=i)
             month_end = month_start + relativedelta(months=1)
-            month_services = get_services_total(
-                OrderItem.objects.filter(
-                    order__employee=user,
-                    order__status='issued',
-                    order__completed_at__gte=month_start,
-                    order__completed_at__lt=month_end,
-                    product__product_type='service'
-                )
-            )
+            month_services = get_services_total_after_discount(user, month_start, month_end)
             chart_services_data.append(float(month_services))
             chart_salary_data.append(
                 float(month_services * Decimal(salary_percent / 100))
@@ -752,12 +639,7 @@ def my_salary(request):
 
     period_services_total = sum(chart_services_data)
     period_salary = period_services_total * (salary_percent / 100)
-    period_orders_count = Order.objects.filter(
-        employee=user,
-        status='issued',
-        completed_at__gte=start_date,
-        completed_at__lt=end_date
-    ).count()
+    period_orders_count = get_completed_orders_count(user, start_date, end_date)
 
     # Список доступных дат для селектов
     available_weeks = []
@@ -848,6 +730,7 @@ def my_salary(request):
     }
     return render(request, "inventorymanager/my_salary.html", context)
 
+
 @require_admin
 @login_required
 def create_supplier(request):
@@ -864,7 +747,6 @@ def create_supplier(request):
         form = SupplierForm()
 
     return render(request, "inventorymanager/createSupplier.html", {"form": form})
-
 
 
 @login_required
@@ -1149,7 +1031,7 @@ def order_list(request):
     page_obj = paginator.get_page(page_number)
     User = get_user_model()
     technicians = User.objects.filter(
-        Q(is_superuser=True) | Q(groups__name='Technician')
+        Q(is_superuser=True) | Q(groups__name='Technician') & Q(is_active=True)
     ).distinct().order_by('first_name', 'username')
 
     context = {

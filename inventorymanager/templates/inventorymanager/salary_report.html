@@ -145,7 +145,7 @@
             <div class="card text-white border-0 shadow-sm" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
                 <div class="card-body text-center">
                     <div class="small opacity-75">Средняя выручка на техника</div>
-                    <div class="h2 mb-0">{{ avg_service_per_technician|floatformat:2 }} ₽</div>
+                    <div class="h2 mb-0">{{ avg_order_value|floatformat:2 }} ₽</div>
                 </div>
             </div>
         </div>
@@ -192,7 +192,7 @@
                             <td class="text-end">{{ item.services_total|floatformat:2 }} ₽</td>
                             <td class="text-end fw-bold text-success">{{ item.salary|floatformat:2 }} ₽</td>
                             <td class="text-end">{{ item.orders_count }}</td>
-                            <td class="text-end">{% if item.orders_count %}{{ avg_order_value|floatformat:2 }} ₽{% else %}—{% endif %}</td>
+                            <td class="text-end">{{ item.avg_order_value }}</td>
                          </tr>
                         {% empty %}
                         <tr>

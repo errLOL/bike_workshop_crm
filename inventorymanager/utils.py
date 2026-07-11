@@ -1,8 +1,11 @@
 # utils.py
 from decimal import Decimal
 
-from django.db.models import Sum, F, Q
+from django.db.models import Sum, F, Q, ExpressionWrapper, DecimalField, Value
 from datetime import datetime, time, date, timedelta
+
+from django.db.models.functions import Coalesce, Greatest
+
 from .models import OrderItem, Order
 from django.contrib.auth import get_user_model
 from calendar import monthrange
@@ -10,57 +13,123 @@ from dateutil.relativedelta import relativedelta
 
 from django.utils import timezone
 
-def calculate_technician_salary(user, start_date=None, end_date=None):
+def get_technician_orders_with_salary(
+    technician=None,
+    start_date=None,
+    end_date=None,
+    salary_percent=40,
+):
+    qs = Order.objects.filter(
+        status='issued',
+    )
+    if technician:
+        qs = Order.objects.filter(
+            employee=technician,
+            status='issued',
+        )
 
-    if start_date is None:
-        start_date = datetime.now().replace(day=1, hour=0, minute=0, second=0)
-    if end_date is None:
-        end_date = datetime.now().replace(day=30, hour=23, minute=59, second=59)
+    if start_date:
+        qs = qs.filter(completed_at__gte=start_date)
 
-    service_percent = 40
+    if end_date:
+        qs = qs.filter(completed_at__lt=end_date)
 
-    # Считаем только завершённые заказы техника
-    services_total = OrderItem.objects.filter(
-        order__employee=user,
-        order__status='issued',
-        order__completed_at__gte=start_date,
-        order__completed_at__lte=end_date,
-        product__product_type='service'
-    ).aggregate(
-        total=Sum(F('quantity') * F('unit_price'))
-    )['total'] or 0
+    return (
+        qs
+        .annotate(
+            services_total_db=Coalesce(
+                Sum(
+                    ExpressionWrapper(
+                        F('order_items__quantity') *
+                        F('order_items__unit_price'),
+                        output_field=DecimalField()
+                    ),
+                    filter=Q(
+                        order_items__product__product_type='service'
+                    )
+                ),
+                Value(Decimal("0.00")),
+                output_field=DecimalField()
+            )
+        )
+        .annotate(
+            services_after_discount=Greatest(
+                ExpressionWrapper(
+                    F("services_total_db") - F("service_discount"),
+                    output_field=DecimalField()
+                ),
+                Value(Decimal("0.00"))
+            )
+        )
+        .annotate(
+            technician_salary=ExpressionWrapper(
+                F("services_after_discount")
+                * Value(Decimal(str(salary_percent)))
+                / Value(Decimal("100")),
+                output_field=DecimalField()
+            )
+        )
+        .select_related(
+            "customer",
+            "transport",
+        )
+    )
 
-    # Зарплата = процент от услуг
-    salary = services_total * Decimal(service_percent / 100)
 
-    return {
-        'services_total': services_total,
-        'salary': salary,
-        'percent': service_percent,
-        'start_date': start_date,
-        'end_date': end_date,
-    }
+def get_services_total_after_discount(
+    technician=None,
+    start_date=None,
+    end_date=None,
+):
+    result = (
+        get_technician_orders_with_salary(
+            technician,
+            start_date,
+            end_date,
+        )
+        .aggregate(
+            total=Sum("services_after_discount")
+        )
+    )
 
-
-def calculate_all_technicians_salary(start_date=None, end_date=None):
-    """Рассчитывает зарплату всех техников за период"""
-
-    User = get_user_model()
-
-    technicians = User.objects.filter(
-        Q(is_superuser=True) | Q(groups__name='Technician')
-    ).distinct()
-
-    results = []
-    for tech in technicians:
-        results.append({
-            'user': tech,
-            **calculate_technician_salary(tech, start_date, end_date)
-        })
-
-    return results
+    return result["total"] or Decimal("0.00")
 
 
+def get_salary_total(
+    technician,
+    start_date,
+    end_date,
+    salary_percent=40,
+):
+    result = (
+        get_technician_orders_with_salary(
+            technician,
+            start_date,
+            end_date,
+            salary_percent,
+        )
+        .aggregate(
+            total=Sum("technician_salary")
+        )
+    )
+
+    return result["total"] or Decimal("0.00")
+
+
+def get_completed_orders_count(
+    technician,
+    start_date,
+    end_date,
+):
+    return (
+        Order.objects.filter(
+            employee=technician,
+            status="issued",
+            completed_at__gte=start_date,
+            completed_at__lt=end_date,
+        )
+        .count()
+    )
 
 
 def make_aware(dt):
