@@ -153,7 +153,19 @@
                                            class="quantity-input form-control"
                                            id="{{ item_form.quantity.id_for_label }}">
                                 </td>
-                                <td class="price-display text-end fw-medium">—</td>
+                                <td class="price-display text-end fw-medium" data-price="{{ item_form.instance.unit_price }}">
+                                    {% if item_form.instance.product.product_type == 'service' %}
+                                        <input type="number"
+                                               name="order_items-{{ forloop.counter0 }}-unit_price"
+                                               value="{{ item_form.instance.unit_price|floatformat:2 }}"
+                                               step="10"
+                                               class="form-control form-control-sm price-input"
+                                               style="width: 100px; display: inline-block;">
+                                    {% else %}
+                                        <span class="part-price">{{ item_form.instance.unit_price|floatformat:2 }}</span>
+                                        <input type="hidden" name="order_items-{{ forloop.counter0 }}-unit_price" value="{{ item_form.instance.unit_price }}">
+                                    {% endif %}
+                                </td>
                                 <td class="subtotal-display text-end fw-bold text-primary">—</td>
                                 <td class="text-center">
                                     {% if item_form.instance.pk %}
@@ -676,10 +688,38 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         const quantity = parseInt(quantityInput ? quantityInput.value : 0) || 0;
-        const price = product.price;
-        const subtotal = price * quantity;
+        let price = product.price;
+        const rowIndex = row.dataset.index;
+        const namePrefix = `order_items-${rowIndex}`;
+         if (product.type === 'service') {
+            let priceInput = priceDisplay.querySelector('.price-input');
+            if (!priceInput) {
+                let existingPrice =
+                    priceDisplay.querySelector('input[type="hidden"]')?.value ||
+                    priceDisplay.dataset.price ||
+                    product.price;
 
-        priceDisplay.textContent = formatMoney(price);
+                priceDisplay.innerHTML = `
+                    <input type="number"
+                           value="${existingPrice}"
+                           step="1"
+                           name="${namePrefix}-unit_price"
+                           class="form-control form-control-sm price-input"
+                           style="width: 100px;">
+                `;
+
+                priceInput = priceDisplay.querySelector('.price-input');
+                priceInput.addEventListener('input', function () {
+                    updateRow(row);
+                });
+            }
+            price = parseFloat(priceInput.value) || 0;
+        }
+        else {
+            priceDisplay.innerHTML = `<span class="part-price">${formatMoney(price)}</span>
+                                   <input type="hidden"  value="${price}">`;
+        }
+        const subtotal = price * quantity;
         subtotalDisplay.textContent = formatMoney(subtotal);
         typeBadge.textContent = product.type === 'part' ? 'Запчасть' : 'Услуга';
         typeBadge.className = 'badge product-type-badge ' + (product.type === 'part' ? 'bg-primary' : 'bg-success');
@@ -700,11 +740,17 @@ document.addEventListener('DOMContentLoaded', function() {
         let servicesTotal = 0;
         let partsTotal = 0;
         document.querySelectorAll('#items-tbody .item-row').forEach(row => {
-            const productInput =row.querySelector('.product-id-input');
+            const productInput = row.querySelector('.product-id-input');
             if (!productInput.value) return;
             const product = productsData[productInput.value];
             const qty = parseFloat(row.querySelector('.quantity-input').value) || 0;
-            const subtotal = qty * product.price;
+            let price = product.price
+            if (product.type === 'service') {
+                const priceDisplay = row.querySelector('.price-display');
+                let priceInput = priceDisplay.querySelector('.price-input');
+                price = priceInput? parseFloat(priceInput.value) : 0;
+            }
+            const subtotal = qty * price;
             if (product.type === 'service') {
                 servicesTotal += subtotal;
             } else {
@@ -739,6 +785,8 @@ document.addEventListener('DOMContentLoaded', function() {
     function bindRowEvents(row) {
         const quantity = row.querySelector('.quantity-input');
         const removeBtn = row.querySelector('.remove-row');
+        const priceInput = row.querySelector('.price-input');
+        console.log(priceInput);
         const picker =
             row.querySelector('.product-picker');
 
@@ -768,6 +816,11 @@ document.addEventListener('DOMContentLoaded', function() {
             row._quantityHandler = () => updateRow(row);
             quantity.addEventListener('input', row._quantityHandler);
         }
+        if (priceInput) {
+            priceInput.removeEventListener('input', row._priceHandler);
+            row._priceHandler = () => updateRow(row);
+            priceInput.addEventListener('input', row._priceHandler);
+        }
         if (removeBtn) {
             removeBtn.removeEventListener('click', row._removeHandler);
             row._removeHandler = () => {
@@ -776,6 +829,7 @@ document.addEventListener('DOMContentLoaded', function() {
             };
             removeBtn.addEventListener('click', row._removeHandler);
         }
+
         updateRow(row);
     }
 

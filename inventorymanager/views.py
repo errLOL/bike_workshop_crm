@@ -1126,6 +1126,7 @@ def create_order(request):
                     if item_form.cleaned_data and not item_form.cleaned_data.get('DELETE', False):
                         product = item_form.cleaned_data['product']
                         quantity = item_form.cleaned_data['quantity']
+                        unit_price = item_form.cleaned_data.get('unit_price')
 
                         # if product.product_type == 'part' and product.quantity_in_stock < quantity:
                         #     messages.error(request, f'Недостаточно {product.name} на складе!')
@@ -1135,7 +1136,7 @@ def create_order(request):
                             order=order,
                             product=product,
                             quantity=quantity,
-                            unit_price=product.unit_cost
+                            unit_price=unit_price or product.unit_cost
                         )
 
                         # if product.product_type == 'part':
@@ -1351,7 +1352,7 @@ def edit_order(request, order_id):
     products = Product.objects.all().order_by('product_type', 'name')
     User = get_user_model()
     technicians = User.objects.filter(
-        Q(is_superuser=True) | Q(groups__name='Technician')
+        Q(is_superuser=True) | Q(groups__name='Technician') & Q(is_active = True)
     ).distinct().order_by('first_name', 'username')
     if request.method == 'POST':
         old_items = {}
