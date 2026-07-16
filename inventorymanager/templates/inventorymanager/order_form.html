@@ -1,5 +1,6 @@
 {% extends "inventorymanager/layout.html" %}
 {% load crispy_forms_tags %}
+{% load static %}
 <link href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" rel="stylesheet" />
 
 {% block body %}
@@ -671,7 +672,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const priceDisplay = row.querySelector('.price-display');
         const subtotalDisplay = row.querySelector('.subtotal-display');
         const typeBadge = row.querySelector('.product-type-badge');
-
         if (!priceDisplay || !subtotalDisplay || !typeBadge) return;
 
         if (!productInput || !productInput.value) {
@@ -681,7 +681,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         const product = productsData[productInput.value];
-        if (!product) {
+        if (!product) {update
             resetRowDisplay(priceDisplay, subtotalDisplay, typeBadge);
             updateTotal();
             return;
@@ -694,10 +694,13 @@ document.addEventListener('DOMContentLoaded', function() {
          if (product.type === 'service') {
             let priceInput = priceDisplay.querySelector('.price-input');
             if (!priceInput) {
-                let existingPrice =
-                    priceDisplay.querySelector('input[type="hidden"]')?.value ||
-                    priceDisplay.dataset.price ||
-                    product.price;
+                const hiddenInput = priceDisplay.querySelector('input[type="hidden"]');
+                let existingPrice = product.price;
+                if (hiddenInput && hiddenInput.value) {
+                    existingPrice = parseFloat(hiddenInput.value) || product.price;
+                } else if (priceDisplay.dataset.price && priceDisplay.dataset.price !== 'None') {
+                    existingPrice = parseFloat(priceDisplay.dataset.price) || product.price;
+                }
 
                 priceDisplay.innerHTML = `
                     <input type="number"
@@ -786,7 +789,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const quantity = row.querySelector('.quantity-input');
         const removeBtn = row.querySelector('.remove-row');
         const priceInput = row.querySelector('.price-input');
-        console.log(priceInput);
         const picker =
             row.querySelector('.product-picker');
 
@@ -860,6 +862,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     .includes(search.toLowerCase())
             ){
                 return;
+            }
+            if (product.type === 'service'){
+             product.image = "{% static 'inventorymanager/img/repair-service.png' %}"
             }
             const imageHtml =
                 product.image
