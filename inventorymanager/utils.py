@@ -37,6 +37,18 @@ def get_technician_orders_with_salary(
     return (
         qs
         .annotate(
+            total_db=Coalesce(
+                Sum(
+                    ExpressionWrapper(
+                        F('order_items__quantity') *
+                        F('order_items__unit_price'),
+                        output_field=DecimalField()
+                    ),
+                ),
+                Value(Decimal("0.00")),
+                output_field=DecimalField()
+            )
+        ).annotate(
             services_total_db=Coalesce(
                 Sum(
                     ExpressionWrapper(

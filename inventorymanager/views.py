@@ -13,7 +13,7 @@ from django.db import transaction
 from django.forms import inlineformset_factory
 from django.views.decorators.http import require_http_methods
 
-from .decorators import require_order_access, require_admin
+from .decorators import require_order_access, require_admin, is_admin
 from .models import Order, OrderItem
 from .forms import *
 from django.db.models import Sum, F, Q, Count, Avg, ExpressionWrapper, DecimalField
@@ -210,7 +210,7 @@ def technician_dashboard(request):
         technician=user,
         start_date=week_ago,
         salary_percent=salary_percent,
-    )
+    ).order_by('-completed_at')
 
     orders_qs = Order.objects.filter(
         employee=user
@@ -400,6 +400,7 @@ def salary_report(request):
     salary_data = []
     total_services_all = 0
     total_salary_all = 0
+    total_revenue_all = 0
     technician_services = {}  # для графика по техникам
 
     for tech in technicians:
@@ -410,13 +411,12 @@ def salary_report(request):
 
         salary = services_total * Decimal(percent / 100)
         orders_count = get_completed_orders_count(tech, start_date, end_date)
-        avg_order_value = (
-        get_technician_orders_with_salary(technician=tech,
-                                          start_date=start_date,
-                                          end_date=end_date,
-                                          salary_percent=percent).aggregate(
-                                            avg=Avg('services_after_discount'))['avg']or 0
-        )
+        technician_orders_qs = get_technician_orders_with_salary(technician=tech,
+                                                                  start_date=start_date,
+                                                                  end_date=end_date,
+                                                                  salary_percent=percent)
+        avg_order_value = technician_orders_qs.aggregate(avg=Avg('services_after_discount'))['avg'] or 0
+        order_total_revenue = technician_orders_qs.aggregate(order_total_revenue=Sum('total_db'))['order_total_revenue'] or 0
         salary_data.append({
             'user': tech,
             'percent': percent,
@@ -424,10 +424,12 @@ def salary_report(request):
             'salary': salary,
             'orders_count': orders_count,
             'avg_order_value': avg_order_value,
+            'order_total_revenue': order_total_revenue,
         })
 
         technician_services[tech.get_full_name() or tech.username] = float(services_total)
         total_services_all += services_total
+        total_revenue_all += order_total_revenue
         total_salary_all += salary
     salary_data.sort(key=lambda x: x['salary'], reverse=True)
 
@@ -515,6 +517,7 @@ def salary_report(request):
         'salary_data': salary_data,
         'total_services': total_services_all,
         'total_salary': total_salary_all,
+        'total_revenue_all': total_revenue_all,
         'period_label': period_label,
         'period_type': period_type,
         'start_date': start_date,
@@ -995,8 +998,8 @@ def order_list(request):
     status = request.GET.get('status', '')
     if status:
         orders = orders.filter(status=status)
-    else:
-        orders = orders.exclude(status__in=("issued", "cancelled"))
+    # else:
+    #     orders = orders.exclude(status__in=("issued", "cancelled"))
 
     # Фильтр по дате (от)
     date_from = request.GET.get('date_from', '')
@@ -1012,6 +1015,15 @@ def order_list(request):
     employee = request.GET.get('employee', '')
     if employee:
         orders = orders.filter(employee=employee)
+
+    # сортировака по дате
+    sort_by = request.GET.get('sort', '-created_at')
+    allowed_sort_fields = ['-created_at', 'created_at', '-completed_at', 'completed_at']
+    if sort_by in allowed_sort_fields:
+        orders = orders.order_by(sort_by)
+    else:
+        orders = orders.order_by('-created_at')
+
     # Статистика для виджетов
     total_orders = Order.objects.count()
     accepted_count = Order.objects.filter(status='accepted').count()
@@ -1355,6 +1367,12 @@ def edit_order(request, order_id):
         Q(is_superuser=True) | Q(groups__name='Technician') & Q(is_active = True)
     ).distinct().order_by('first_name', 'username')
     if request.method == 'POST':
+        print(order.status == 'issued')
+        print(is_admin(User))
+        if order.status == 'issued' and not is_admin(request.user):
+            messages.error(request,f'Ошибка доступа')
+            return redirect('order_detail', order_id=order.id)
+
         old_items = {}
         if order.status in ('in_work', 'ready'):
             old_items = {
@@ -1532,9 +1550,11 @@ def change_order_status(request, order_id):
     valid_statuses = [choice[0] for choice in Order.STATUS_CHOICES]
 
     if status not in valid_statuses or order.status == status:
-        messages.warning(request, f"Недопустимый статус заказа.")
+        messages.error(request, f"Недопустимый статус заказа.")
         return redirect('order_detail', order_id=order.id)
-
+    if order.status not in ("in_work", "ready") and status == "issued":
+        messages.error(request, 'Переведите заказ в статус "Готов".')
+        return redirect('order_detail', order_id=order.id)
     if status == 'in_work'  and order.status in ('accepted', 'waiting_spareparts'):
         with transaction.atomic():
             missing_parts = []

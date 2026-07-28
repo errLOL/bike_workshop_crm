@@ -104,6 +104,24 @@
         float: right;
         margin-top: 8px;
     }
+
+    .loader-overlay {
+        position: relative;
+        display: inline-block;
+    }
+
+    .loader-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+
+    .loader-container .spinner-border {
+        width: 3rem;
+        height: 3rem;
+    }
 </style>
 {% endblock %}
 {% block body %}
@@ -278,6 +296,12 @@
                     <button type="button" id="confirmUploadBtn" class="btn btn-primary mt-2 w-100" style="display: none;">
                         <i class="fas fa-check me-1"></i>Добавить фото
                     </button>
+                    <div id="uploadLoader" style="display: none;" class="text-center py-3">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Загрузка...</span>
+                    </div>
+                    <div class="mt-2 text-muted small">Загрузка фото...</div>
+                </div>
                 </div>
 
                 <!-- Галерея фото -->
@@ -671,6 +695,22 @@ cancelPreviewBtn.addEventListener('click', function() {
 confirmUploadBtn.addEventListener('click', function() {
     if (!selectedFile) return;
 
+    // Показываем лоадер, скрываем кнопку
+    const loader = document.getElementById('uploadLoader');
+    const confirmBtn = document.getElementById('confirmUploadBtn');
+
+    loader.style.display = 'block';
+    confirmBtn.style.display = 'none';
+    confirmBtn.disabled = true;
+
+    // Добавляем небольшой анимационный эффект для текста
+    const loaderText = loader.querySelector('.text-muted');
+    let dots = 0;
+    const dotInterval = setInterval(() => {
+        dots = (dots + 1) % 4;
+        loaderText.textContent = 'Загрузка фото' + '.'.repeat(dots);
+    }, 300);
+
     const formData = new FormData();
     formData.append('image', selectedFile);
     formData.append('description', photoDescription.value);
@@ -686,18 +726,28 @@ confirmUploadBtn.addEventListener('click', function() {
     })
     .then(response => response.json())
     .then(data => {
+        clearInterval(dotInterval);
         if (data.success) {
             // Перезагружаем только галерею
             location.reload();
         } else {
             alert(data.error || 'Ошибка при загрузке');
             resetUploadForm();
+            // Скрываем лоадер и показываем кнопку
+            loader.style.display = 'none';
+            confirmBtn.style.display = 'block';
+            confirmBtn.disabled = false;
         }
     })
     .catch(error => {
+        clearInterval(dotInterval);
         console.error('Error:', error);
         alert('Ошибка при загрузке фото');
         resetUploadForm();
+        // Скрываем лоадер и показываем кнопку
+        loader.style.display = 'none';
+        confirmBtn.style.display = 'block';
+        confirmBtn.disabled = false;
     });
 });
 
@@ -706,11 +756,20 @@ function resetUploadForm() {
     photoInput.value = '';
     previewArea.style.display = 'none';
     photoDescription.style.display = 'none';
-    confirmUploadBtn.style.display = 'none';
+    confirmUploadBtn.style.display = 'block';
+    confirmUploadBtn.disabled = false;
     uploadTrigger.style.display = 'block';
     photoDescription.value = '';
     pendingPhoto.value = '';
+
+    // Скрываем лоадер
+    const loader = document.getElementById('uploadLoader');
+    loader.style.display = 'none';
+    // Возвращаем исходный текст
+    const loaderText = loader.querySelector('.text-muted');
+    if (loaderText) loaderText.textContent = 'Загрузка фото...';
 }
+
 function showImageModal(src, description) {
     document.getElementById('modalImage').src = src;
     document.getElementById('modalDescription').textContent = description;

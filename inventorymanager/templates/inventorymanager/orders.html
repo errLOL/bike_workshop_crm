@@ -179,6 +179,22 @@
                 </select>
             </div>
             <div class="col-md-3">
+                <select name="sort" class="form-select">
+                    <option value="-created_at" {% if request.GET.sort == '-created_at' or not request.GET.sort %}selected{% endif %}>
+                        По дате создания (новые)
+                    </option>
+                    <option value="created_at" {% if request.GET.sort == 'created_at' %}selected{% endif %}>
+                        По дате создания (старые)
+                    </option>
+                    <option value="-completed_at" {% if request.GET.sort == '-completed_at' %}selected{% endif %}>
+                        По дате завершения (новые)
+                    </option>
+                    <option value="completed_at" {% if request.GET.sort == 'completed_at' %}selected{% endif %}>
+                        По дате завершения (старые)
+                    </option>
+                </select>
+            </div>
+            <div class="col-md-3">
                 <input type="date" name="date_from" class="form-control" placeholder="С даты"
                        value="{{ request.GET.date_from|default:'' }}">
             </div>
@@ -252,10 +268,12 @@
 
                     <!-- Действия -->
                     <div class="col-md-2 text-md-end">
+                        {% if order.status != 'issued' or admin %}
                         <div class="btn-group" role="group">
                             <a href="{% url 'order_detail' order.id %}" class="btn btn-sm btn-outline-primary" title="Просмотр">
                                 <i class="fas fa-eye"></i>
                             </a>
+
                             <a href="{% url 'edit_order' order.id %}" class="btn btn-sm btn-outline-secondary" title="Редактировать">
                                 <i class="fas fa-edit"></i>
                             </a>
@@ -265,6 +283,7 @@
                                 <i class="fas fa-times"></i>
                             </button>
                         </div>
+                        {% endif %}
                         <div class="mt-2">
                             {% if order.status == 'accepted' or order.status == 'waiting_spareparts' %}
                             <button type="button" class="btn btn-warning"
