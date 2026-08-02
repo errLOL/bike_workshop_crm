@@ -1555,7 +1555,8 @@ def change_order_status(request, order_id):
     if order.status not in ("in_work", "ready") and status == "issued":
         messages.error(request, 'Переведите заказ в статус "Готов".')
         return redirect('order_detail', order_id=order.id)
-    if status == 'in_work'  and order.status in ('accepted', 'waiting_spareparts'):
+
+    if status in ('in_work', 'ready')  and order.status in ('accepted', 'waiting_spareparts'):
         with transaction.atomic():
             missing_parts = []
             for item in order.order_items.all():

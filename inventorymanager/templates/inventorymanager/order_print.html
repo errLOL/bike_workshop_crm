@@ -359,10 +359,15 @@ table {
         <tr>
             <td>Сумма заказа</td>
             <td class="text-right">
-                {{ order.total_amount|floatformat:2 }} ₽
+                {{ order.total|floatformat:2 }} ₽
             </td>
         </tr>
-
+        <tr>
+            <td>Скидка</td>
+            <td class="text-right">
+                {{ order.total_discount|floatformat:2|default:0 }} ₽
+            </td>
+        </tr>
         <tr>
             <td>Оплачено</td>
             <td class="text-right">
