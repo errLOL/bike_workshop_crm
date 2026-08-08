@@ -25,6 +25,7 @@ urlpatterns = [
     path("create_order", views.create_order, name="create_order"),
     path("create_category", views.create_category, name="create_category"),
     path('upload_transport_photo/<int:transport_id>', views.upload_transport_photo, name='upload_transport_photo'),
+    path('get-technician-orders/', views.get_technician_orders, name='get_technician_orders'),
     # path('api/customers/create/', views.api_create_customer, name='api_create_customer'),
     # path('api/transports/create/', views.api_create_transport, name='api_create_transport'),
     # Detail urls

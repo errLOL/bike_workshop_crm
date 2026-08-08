@@ -11,7 +11,8 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.forms import inlineformset_factory
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods, require_POST
 
 from .decorators import require_order_access, require_admin, is_admin
 from .models import Order, OrderItem
@@ -537,6 +538,80 @@ def salary_report(request):
     }
     return render(request, "inventorymanager/salary_report.html", context)
 
+
+@login_required
+@require_POST
+@csrf_exempt
+def get_technician_orders(request):
+
+    technician_id = request.POST.get('technician_id')
+    period = request.POST.get('period', 'month')
+    selected_date = request.POST.get('start_date')
+
+    if not technician_id:
+        return JsonResponse({'success': False, 'error': 'Technician ID required'})
+
+    try:
+        User = get_user_model()
+        technician = User.objects.get(id=technician_id)
+
+        # Получаем период
+        start_date, end_date = get_period_range(period, selected_date)
+
+        # Получаем процент техника
+        try:
+            if hasattr(technician, 'technician_profile'):
+                percent = technician.technician_profile.service_percent
+            else:
+                percent = 40
+        except:
+            percent = 40
+
+        # Получаем заказы техника за период
+        orders = get_technician_orders_with_salary(
+            technician=technician,
+            start_date=start_date,
+            end_date=end_date,
+            salary_percent=percent
+        ).order_by('-completed_at')
+
+        # Формируем данные для ответа
+        orders_data = []
+        for order in orders:
+            technician_share = order.services_after_discount * Decimal(percent / 100)
+
+            orders_data.append({
+                'id': order.id,
+                'number': f'№{order.id}',
+                'client': order.customer.name,
+                'total': float(order.total),
+                'services_amount': float(order.services_total_after_discount),
+                'technician_share': float(order.services_total_after_discount) * 0.4,
+                'completed_at': order.completed_at.strftime('%d.%m.%Y %H:%M') if order.completed_at else '—',
+                'status': order.status,
+                'status_label': dict(Order.STATUS_CHOICES).get(order.status, order.status),
+                'status_color': get_status_color(order.status),
+            })
+
+        return JsonResponse({
+            'success': True,
+            'orders': orders_data,
+        })
+
+    except User.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Technician not found'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+def get_status_color(status):
+    colors = {
+        'new': 'secondary',
+        'in_progress': 'primary',
+        'completed': 'success',
+        'issued': 'info',
+        'cancelled': 'danger',
+    }
+    return colors.get(status, 'secondary')
 
 @login_required
 def my_salary(request):

@@ -193,7 +193,15 @@
                             <td class="text-end">{{ item.order_total_revenue|floatformat:2 }} ₽</td>
                             <td class="text-end">{{ item.services_total|floatformat:2 }} ₽</td>
                             <td class="text-end fw-bold text-success">{{ item.salary|floatformat:2 }} ₽</td>
-                            <td class="text-end">{{ item.orders_count }}</td>
+                            <td class="text-end">
+                                <a href="#"
+                                   class="orders-link text-primary text-decoration-none"
+                                   data-technician-id="{{ item.user.id }}"
+                                   data-technician-name="{{ item.user.get_full_name|default:item.user.username }}"
+                                   data-orders-count="{{ item.orders_count }}">
+                                    {{ item.orders_count }}
+                                </a>
+                            </td>
                             <td class="text-end">{{ item.avg_order_value }}</td>
                          </tr>
                         {% empty %}
@@ -219,9 +227,45 @@
             </div>
         </div>
     </div>
+    <!-- Модальное окно для заказов -->
+    <div class="modal fade" id="ordersModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-list me-2 text-primary"></i>
+                        <span id="ordersModalTitle">Заказы техника</span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="ordersTableContainer">
+                        <div class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Загрузка...</span>
+                            </div>
+                            <p class="mt-2 text-muted">Загрузка заказов...</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <div class="me-auto">
+                        <span class="text-muted" id="ordersSummary"></span>
+                    </div>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                    <button type="button" class="btn btn-primary" onclick="window.print()">
+                        <i class="fas fa-print me-1"></i>Печать
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="exportOrdersToExcel()">
+                        <i class="fas fa-file-excel me-1"></i>Экспорт
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
-
-
+{% endblock %}
+{% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const periodSelect = document.getElementById('periodSelect');
@@ -362,6 +406,172 @@ document.addEventListener('DOMContentLoaded', function() {
         dateSelect.appendChild(option);
         dateSelect.disabled = true;
     }
+    // Функция показа заказов
+    function showOrders(e) {
+        const element = e.originalTarget
+        const technicianId = element.dataset.technicianId;
+        const technicianName = element.dataset.technicianName;
+        const ordersCount = element.dataset.ordersCount;
+
+        // Обновляем заголовок модального окна
+        document.getElementById('ordersModalTitle').textContent =
+            `Заказы техника: ${technicianName}`;
+
+        // Показываем индикатор загрузки
+        document.getElementById('ordersTableContainer').innerHTML = `
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Загрузка...</span>
+                </div>
+                <p class="mt-2 text-muted">Загрузка заказов...</p>
+            </div>
+        `;
+
+        // Открываем модальное окно
+        const modal = new bootstrap.Modal(document.getElementById('ordersModal'));
+        modal.show();
+
+        // Загружаем данные через AJAX
+        const formData = new FormData();
+        formData.append('technician_id', technicianId);
+        formData.append('start_date', document.querySelector('[name="date"]')?.value || '');
+        formData.append('period', document.querySelector('[name="period"]')?.value || 'month');
+
+        fetch('{% url "get_technician_orders" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                renderOrdersTable(data);
+            } else {
+                document.getElementById('ordersTableContainer').innerHTML = `
+                    <div class="alert alert-danger">${data.error || 'Ошибка загрузки данных'}</div>
+                `;
+            }
+        })
+        .catch(error => {
+            document.getElementById('ordersTableContainer').innerHTML = `
+                <div class="alert alert-danger">Ошибка загрузки данных: ${error.message}</div>
+            `;
+        });
+    }
+
+    // Функция рендеринга таблицы заказов
+    function renderOrdersTable(data) {
+        let html = `
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>№ заказа</th>
+                            <th>Клиент</th>
+                            <th class="text-end">Сумма заказа</th>
+                            <th class="text-end">Сумма услуг</th>
+                            <th class="text-end">Доля техника</th>
+                            <th>Дата завершения</th>
+                            <th>Статус</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        let totalOrders = 0;
+        let totalRevenue = 0;
+        let totalSalary = 0;
+
+        data.orders.forEach(order => {
+            html += `
+                <tr>
+                    <td>
+                        <a href="{% url 'order_detail' 0 %}".replace('0', order.id)
+                           target="_blank"
+                           class="text-primary text-decoration-none">
+                            <i class="fas fa-external-link-alt me-1 small"></i>${order.number}
+                        </a>
+                    </td>
+                    <td>${order.client || '—'}</td>
+                    <td class="text-end">${formatNumber(order.total)} ₽</td>
+                    <td class="text-end">${formatNumber(order.services_amount)} ₽</td>
+                    <td class="text-end fw-bold text-success">${formatNumber(order.technician_share)} ₽</td>
+                    <td>${order.completed_at || '—'}</td>
+                    <td>
+                        <span class="badge bg-${order.status_color}">
+                            ${order.status_label}
+                        </span>
+                    </td>
+                </tr>
+            `;
+            totalOrders++;
+            totalRevenue += order.total;
+            totalSalary += order.technician_share;
+        });
+
+        html += `
+                    </tbody>
+                    <tfoot class="table-light fw-bold">
+                        <tr>
+                            <td colspan="2">Итого: ${totalOrders} заказов</td>
+                            <td class="text-end">${formatNumber(totalRevenue)} ₽</td>
+                            <td class="text-end">—</td>
+                            <td class="text-end text-success">${formatNumber(totalSalary)} ₽</td>
+                            <td colspan="2"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        `;
+
+        document.getElementById('ordersTableContainer').innerHTML = html;
+        document.getElementById('ordersSummary').textContent =
+            `Всего заказов: ${totalOrders}, общая выручка: ${formatNumber(totalRevenue)} ₽, фонд зарплаты: ${formatNumber(totalSalary)} ₽`;
+    }
+
+    // Функция форматирования чисел
+    function formatNumber(num) {
+        return Number(num).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    }
+
+    // Функция экспорта в Excel
+    function exportOrdersToExcel() {
+        const table = document.querySelector('#ordersTableContainer table');
+        if (!table) return;
+
+        // Создаем CSV
+        let csv = '№ заказа,Клиент,Сумма заказа,Сумма услуг,Доля техника,Дата завершения,Статус\n';
+
+        table.querySelectorAll('tbody tr').forEach(row => {
+            const cells = row.querySelectorAll('td');
+            const rowData = [];
+            cells.forEach((cell, index) => {
+                if (index === 0) {
+                    // Извлекаем номер заказа из ссылки
+                    const link = cell.querySelector('a');
+                    rowData.push(link ? link.textContent.trim() : cell.textContent.trim());
+                } else if (index === 1) {
+                    rowData.push(cell.textContent.trim());
+                } else {
+                    rowData.push(cell.textContent.trim());
+                }
+            });
+            csv += rowData.join(',') + '\n';
+        });
+
+        // Скачиваем файл
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `заказы_${document.getElementById('ordersModalTitle').textContent.replace('Заказы техника: ', '')}.csv`;
+        link.click();
+    }
+    const show_order_links = document.querySelectorAll(".orders-link");
+    show_order_links.forEach((order_link, index) => {
+        order_link.addEventListener('click', showOrders);
+    });
 });
 </script>
 {% endblock %}
