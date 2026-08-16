@@ -253,7 +253,8 @@ class Order(BaseModel):
                 'parts_discount': 'Скидка не может быть отрицательной.'
             })
 
-
+    def get_absolute_url(self):
+        return reverse('order_detail', kwargs={'order_id': self.id})
     def __str__(self):
         transport_info = f" - {self.transport.name}" if self.transport else ""
         return f"Заказ #{self.id} от {self.created_at.strftime('%d.%m.%Y')}{transport_info}"

@@ -25,7 +25,8 @@ SECRET_KEY = "django-insecure-$rb9-6f*ta7ja#wzze(ztc=5&c!)5357i5+(_u6*qoj8jonc^=
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*"]
+DOMAIN = "http://127.0.0.1"
 
 
 # Application definition
@@ -61,7 +62,7 @@ MIDDLEWARE = [
 INTERNAL_IPS = [
     # ...
     "127.0.0.1",
-    # ...
+    # ..
 ]
 
 ROOT_URLCONF = "inventory_system.urls"

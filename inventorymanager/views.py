@@ -1,4 +1,5 @@
 import base64
+import os
 from calendar import monthrange
 from datetime import timedelta, datetime, date
 from decimal import Decimal
@@ -17,6 +18,7 @@ from django.forms import inlineformset_factory
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods, require_POST
 
+from inventory_system.settings import DOMAIN, BASE_DIR
 from .decorators import require_order_access, require_admin, is_admin
 from .models import Order, OrderItem
 from .forms import *
@@ -1261,22 +1263,27 @@ def create_order(request):
     return render(request, 'inventorymanager/order_form.html', context)
 
 
+
 @login_required
 def print_label(request, order_id):
     """Страница для печати этикетки с QR-кодом"""
     order = get_object_or_404(Order, id=order_id)
-    qr_data = f"Заказ #{order.id}\nКлиент: {order.customer.name}\nСумма: {order.total} ₽"
+    uri = order.get_absolute_url()
+    qr_data = DOMAIN + uri
     qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=6,
-        border=2,
+        version=3,
+        error_correction=qrcode.constants.ERROR_CORRECT_H,
+        box_size=9,
+        border=1,
     )
     qr.add_data(qr_data)
     qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white")
+
+    qr_img = qr.make_image(fill_color="black", back_color="white").convert('RGB')
+    qr_size = qr_img.size[0]
+
     buffer = BytesIO()
-    img.save(buffer, format='PNG')
+    qr_img.save(buffer, format='PNG')
     qr_base64 = base64.b64encode(buffer.getvalue()).decode()
     context = {
         'order': order,
