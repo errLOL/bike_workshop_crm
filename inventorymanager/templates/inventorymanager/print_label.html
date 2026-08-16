@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Этикетка #{{ order.id }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 10px;
+        }
+
+        .label {
+            width: 58mm;
+            min-height: 30mm;
+            padding: 2mm 3mm;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 2px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            font-size: 7pt;
+            line-height: 1.2;
+        }
+
+        /* Верхняя строка: номер заказа и статус */
+        .label-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #000;
+            padding-bottom: 1mm;
+            margin-bottom: 1mm;
+        }
+
+        .label-top .order-id {
+            font-weight: bold;
+            font-size: 10pt;
+            letter-spacing: 1px;
+        }
+
+        .label-top .status {
+            font-size: 6pt;
+            font-weight: bold;
+            padding: 0.5mm 2mm;
+            border: 1px solid #000;
+            border-radius: 1px;
+            background: #f8f8f8;
+        }
+
+        /* Информация о клиенте и технике (в одну строку) */
+        .info-line {
+            display: flex;
+            justify-content: space-between;
+            font-size: 6.5pt;
+            padding: 0.5mm 0;
+            border-bottom: 1px dotted #ddd;
+        }
+
+        .info-line .label-text {
+            color: #666;
+        }
+
+        .info-line .value {
+            font-weight: 600;
+            max-width: 35mm;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .qr-price-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 1mm 0;
+            padding: 1mm 0;
+        }
+
+        .qr-container img {
+            width: 18mm;
+            height: 18mm;
+            display: block;
+            image-rendering: pixelated;
+        }
+
+        .label-bottom {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid #000;
+            padding-top: 0.5mm;
+            margin-top: 0.5mm;
+            font-size: 5.5pt;
+            color: #666;
+        }
+
+        .label-bottom .barcode-text {
+            font-family: 'Courier New', monospace;
+            font-size: 8pt;
+            letter-spacing: 1px;
+            font-weight: 600;
+            color: #000;
+        }
+
+        /* Для печати */
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+                margin: 0;
+            }
+
+            .label {
+                border: none !important;
+                border-radius: 0 !important;
+                width: 58mm;
+                min-height: 30mm;
+                padding: 1.5mm 2mm;
+                page-break-after: avoid;
+                page-break-inside: avoid;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+        }
+
+        /* Кнопка печати */
+        .print-btn {
+            display: inline-block;
+            padding: 10px 24px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            margin: 8px;
+            text-decoration: none;
+        }
+
+        .print-btn:hover {
+            background: #45a049;
+        }
+
+        .btn-container {
+            text-align: center;
+            margin: 10px 0;
+        }
+
+        .btn-container small {
+            display: block;
+            margin-top: 4px;
+            color: #999;
+            font-size: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <!-- Кнопка печати (не видна при печати) -->
+        <div class="btn-container no-print">
+            <button onclick="window.print()" class="print-btn">
+                🖨️ Печать этикетки (58×30 мм)
+            </button>
+            <br>
+            <small>
+                <a href="{% url 'order_detail' order.id %}" style="color: #666;">← Вернуться к заказу</a>
+            </small>
+        </div>
+
+        <!-- Этикетка -->
+        <div class="label" id="label">
+            <!-- Верх: номер + статус -->
+            <div class="label-top">
+                <span class="order-id">#{{ order.id }}</span>
+                <span class="status">
+                    {% if order.status == 'accepted' %}ПРИНЯТ
+                    {% elif order.status == 'in_work' %}В РАБОТЕ
+                    {% elif order.status == 'ready' %}ГОТОВ
+                    {% elif order.status == 'issued' %}ВЫДАН
+                    {% else %}{{ order.get_status_display }}
+                    {% endif %}
+                </span>
+            </div>
+
+            <div class="info-line">
+                <span class="label-text">Клиент:</span>
+                <span class="value">{{ order.customer.name|truncatechars:15|default:"—" }}({{order.customer.phone}})</span>
+            </div>
+            <div class="info-line">
+                <span class="label-text">Техника:</span>
+                <span class="value">{{ order.transport.name|truncatechars:15|default:"—" }}</span>
+            </div>
+
+            <div class="qr-price-row">
+                <div class="qr-container">
+                    <img src="data:image/png;base64,{{ qr_base64 }}" alt="QR">
+                </div>
+            </div>
+
+            <div class="label-bottom">
+                <span>{{ order.created_at|date:"d.m.Y H:i" }}</span>
+                <span class="barcode-text">{{ order.id|stringformat:"06d" }}</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Автоматическая печать при загрузке (опционально)
+        // window.onload = function() { window.print(); };
+
+        // Обновление размера QR при изменении размера окна
+        function adjustQRSize() {
+            const labelWidth = document.querySelector('.label').offsetWidth;
+            const qrImg = document.querySelector('.qr-container img');
+            if (qrImg && labelWidth > 0) {
+                const size = Math.min(labelWidth * 0.7, 200);
+                qrImg.style.width = size + 'px';
+                qrImg.style.height = size + 'px';
+            }
+        }
+
+        window.addEventListener('load', adjustQRSize);
+        window.addEventListener('resize', adjustQRSize);
+    </script>
+</body>
+</html>

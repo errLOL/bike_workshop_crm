@@ -1,7 +1,10 @@
+import base64
 from calendar import monthrange
 from datetime import timedelta, datetime, date
 from decimal import Decimal
+from io import BytesIO
 
+import qrcode
 from dateutil.relativedelta import relativedelta
 from django.core.paginator import Paginator
 from django.shortcuts import render, redirect, get_object_or_404
@@ -1243,6 +1246,7 @@ def create_order(request):
         formset = OrderItemFormSet()
         initial_customer = request.GET.get('customer')
         initial_transport = request.GET.get('transport')
+
     context = {
         'form': form,
         'formset': formset,
@@ -1255,6 +1259,31 @@ def create_order(request):
         'title': 'Создание заказа',
     }
     return render(request, 'inventorymanager/order_form.html', context)
+
+
+@login_required
+def print_label(request, order_id):
+    """Страница для печати этикетки с QR-кодом"""
+    order = get_object_or_404(Order, id=order_id)
+    qr_data = f"Заказ #{order.id}\nКлиент: {order.customer.name}\nСумма: {order.total} ₽"
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=6,
+        border=2,
+    )
+    qr.add_data(qr_data)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    buffer = BytesIO()
+    img.save(buffer, format='PNG')
+    qr_base64 = base64.b64encode(buffer.getvalue()).decode()
+    context = {
+        'order': order,
+        'qr_base64': qr_base64,
+        'qr_data': qr_data,
+    }
+    return render(request, 'inventorymanager/print_label.html', context)
 
 
 @login_required
