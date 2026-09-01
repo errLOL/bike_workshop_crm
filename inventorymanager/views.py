@@ -1075,9 +1075,18 @@ def order_list(request):
         )
 
     # Фильтр по статусу
-    status = request.GET.get('status', '')
-    if status:
-        orders = orders.filter(status=status)
+    statuses = []
+    status_list = request.GET.getlist('status')
+
+    if len(status_list) > 1:
+        statuses = [s for s in status_list if s]
+    else:
+        status_str = request.GET.get('status', '')
+        if status_str:
+            statuses = [s.strip() for s in status_str.split(',') if s.strip()]
+
+    if statuses:
+        orders = orders.filter(status__in=statuses)
     # else:
     #     orders = orders.exclude(status__in=("issued", "cancelled"))
 
@@ -1117,8 +1126,7 @@ def order_list(request):
         total=Sum(F('order_items__quantity') * F('order_items__unit_price'))
     )['total'] or 0
 
-    # Пагинация (15 заказов на страницу)
-    paginator = Paginator(orders, 15)
+    paginator = Paginator(orders, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     User = get_user_model()
@@ -1126,6 +1134,7 @@ def order_list(request):
         Q(is_superuser=True) | Q(groups__name='Technician') & Q(is_active=True)
     ).distinct().order_by('first_name', 'username')
 
+    status_choices = Order.STATUS_CHOICES
     context = {
         'orders': page_obj,
         'page_obj': page_obj,
@@ -1138,7 +1147,8 @@ def order_list(request):
         'waiting_spareparts_count': waiting_spareparts_count,
         'total_revenue': total_revenue,
         'search_query': search_query,
-        'status_filter': status,
+        'selected_statuses': statuses,
+        'status_choices': status_choices,
         'date_from': date_from,
         'date_to': date_to,
         'technicians': technicians,

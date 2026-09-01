@@ -4,339 +4,1088 @@
 {% load crispy_forms_tags %}
 
 {% block title %}Заказы - Мастерская{% endblock %}
+
 {% block extra_css %}
 <style>
-    .order-card {
-        transition: all 0.2s ease;
-        border-left: 4px solid;
-        margin-bottom: 1rem;
+    /* ===== ОБЩИЕ СТИЛИ ===== */
+    :root {
+        --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --success-gradient: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        --danger-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        --info-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        --warning-gradient: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+        --dark-gradient: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
     }
-    .order-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
-    }
-    .order-card.accepted { border-left-color: rgb(13, 110, 253); }
-    .order-card.in_work { border-left-color: #17a2b8; }
-    .order-card.waiting_spareparts { border-left-color: #fd7e14; }
-    .order-card.ready { border-left-color: #28a745; }
-    .order-card.issued { border-left-color: ##ffc107; }
 
-    .order-number {
-        font-size: 1.1rem;
-        font-weight: 600;
-        color: #2c3e50;
+    .page-wrapper {
+        padding: 1.5rem 0;
+        background: #f8f9fc;
+        min-height: 100vh;
     }
-    .order-meta {
-        font-size: 0.85rem;
-        color: #6c757d;
+
+    /* ===== ЗАГОЛОВОК ===== */
+    .page-header {
+        background: white;
+        border-radius: 16px;
+        padding: 1.5rem 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
     }
-    .order-total {
-        font-size: 1.25rem;
+
+    .page-title {
+        font-size: 1.75rem;
         font-weight: 700;
         color: #2c3e50;
+        margin: 0;
     }
-    .status-badge {
-        padding: 0.35rem 0.75rem;
-        border-radius: 20px;
-        font-size: 0.75rem;
+
+    .page-title svg {
+        background: var(--primary-gradient);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-right: 0.75rem;
+    }
+
+    .btn-create {
+        background: var(--primary-gradient);
+        border: none;
+        padding: 0.6rem 1.5rem;
+        border-radius: 50px;
         font-weight: 600;
-    }
-    .filter-bar {
-        background: white;
-        border-radius: 12px;
-        padding: 1rem;
-        margin-bottom: 1.5rem;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    }
-    .stats-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
         color: white;
-        border-radius: 16px;
-        padding: 1.25rem;
-        margin-bottom: 1.5rem;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
     }
-    .stats-number {
+
+    .btn-create:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 25px rgba(102, 126, 234, 0.5);
+        color: white;
+    }
+
+    /* ===== СТАТИСТИКА ===== */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .stats-card {
+        background: white;
+        border-radius: 16px;
+        padding: 1.25rem 1.5rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+        border: none;
+    }
+
+    .stats-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+    }
+
+    .stats-card .stats-icon {
+        position: absolute;
+        right: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 2.5rem;
+        opacity: 0.15;
+    }
+
+    .stats-card .stats-number {
         font-size: 2rem;
         font-weight: 700;
-        line-height: 1;
+        color: #2c3e50;
+        line-height: 1.2;
     }
-    .stats-label {
+
+    .stats-card .stats-label {
         font-size: 0.85rem;
-        opacity: 0.9;
+        color: #6c757d;
+        font-weight: 500;
     }
-    .search-input {
-        border-radius: 20px;
-        padding-left: 2.5rem;
+
+    .stats-card.primary .stats-number { color: #667eea; }
+    .stats-card.success .stats-number { color: #28a745; }
+    .stats-card.danger .stats-number { color: #dc3545; }
+    .stats-card.info .stats-number { color: #17a2b8; }
+    .stats-card.warning .stats-number { color: #fd7e14; }
+    .stats-card.dark .stats-number { color: #2c3e50; }
+
+    /* ===== ФИЛЬТРЫ ===== */
+    .filter-bar {
+        background: white;
+        border-radius: 16px;
+        padding: 1.5rem 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
     }
-    .search-icon {
+
+    .filter-bar .form-control,
+    .filter-bar .form-select {
+        border-radius: 12px;
+        border: 2px solid #e9ecef;
+        padding: 0.6rem 1rem;
+        transition: all 0.3s ease;
+        font-size: 0.9rem;
+    }
+
+    .filter-bar .form-control:focus,
+    .filter-bar .form-select:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15);
+    }
+
+    .filter-bar .form-control::placeholder {
+        color: #adb5bd;
+        font-size: 0.85rem;
+    }
+
+    .filter-bar .search-wrapper {
+        position: relative;
+    }
+
+    .filter-bar .search-wrapper .search-icon {
         position: absolute;
         left: 1rem;
         top: 50%;
         transform: translateY(-50%);
         color: #adb5bd;
+        font-size: 0.9rem;
+        z-index: 2;
     }
-    @media (max-width: 768px) {
-        .stats-card {
-            margin-bottom: 1rem;
+
+    .filter-bar .search-wrapper input {
+        padding-left: 2.8rem;
+    }
+
+    .filter-bar .btn-filter {
+        background: var(--primary-gradient);
+        border: none;
+        border-radius: 12px;
+        padding: 0.6rem 1.5rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        color: white;
+        width: 100%;
+    }
+
+    .filter-bar .btn-filter:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        color: white;
+    }
+
+    .filter-bar .btn-reset {
+        border-radius: 12px;
+        padding: 0.6rem 1.5rem;
+        border: 2px solid #e9ecef;
+        background: white;
+        transition: all 0.3s ease;
+        width: 100%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .filter-bar .btn-reset:hover {
+        background: #f8f9fa;
+        border-color: #dee2e6;
+    }
+
+    /* ===== КАСТОМНЫЙ СЕЛЕКТ С МНОЖЕСТВЕННЫМ ВЫБОРОМ ===== */
+    .custom-multiselect {
+        position: relative;
+        cursor: pointer;
+    }
+
+    .custom-multiselect .multiselect-display {
+        border: 2px solid #e9ecef;
+        border-radius: 12px;
+        padding: 0.6rem 2.5rem 0.6rem 1rem;
+        background: white;
+        min-height: 46px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.25rem;
+        transition: all 0.3s ease;
+        position: relative;
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .custom-multiselect .multiselect-display:hover {
+        border-color: #667eea;
+    }
+
+    .custom-multiselect .multiselect-display .arrow {
+        position: absolute;
+        right: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        transition: transform 0.3s ease;
+        color: #6c757d;
+    }
+
+    .custom-multiselect .multiselect-display .arrow.open {
+        transform: translateY(-50%) rotate(180deg);
+    }
+
+    .custom-multiselect .multiselect-display .placeholder {
+        color: #adb5bd;
+        font-size: 0.9rem;
+    }
+
+    .custom-multiselect .multiselect-display .selected-tag {
+        background: var(--primary-gradient);
+        color: white;
+        padding: 0.15rem 0.6rem;
+        border-radius: 50px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        animation: tagAppear 0.2s ease;
+    }
+
+    .custom-multiselect .multiselect-display .selected-tag .remove-tag {
+        cursor: pointer;
+        opacity: 0.7;
+        transition: opacity 0.2s ease;
+        font-size: 0.7rem;
+    }
+
+    .custom-multiselect .multiselect-display .selected-tag .remove-tag:hover {
+        opacity: 1;
+    }
+
+    @keyframes tagAppear {
+        from {
+            transform: scale(0.8);
+            opacity: 0;
         }
-        .order-card .row > div {
-            margin-bottom: 0.5rem;
+        to {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+
+    .custom-multiselect .multiselect-dropdown {
+        position: absolute;
+        top: calc(100% + 5px);
+        left: 0;
+        right: 0;
+        background: white;
+        border: 2px solid #e9ecef;
+        border-radius: 12px;
+        padding: 0.5rem;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.12);
+        z-index: 1000;
+        display: none;
+        max-height: 250px;
+        overflow-y: auto;
+    }
+
+    .custom-multiselect .multiselect-dropdown.open {
+        display: block;
+        animation: dropdownOpen 0.2s ease;
+    }
+
+    @keyframes dropdownOpen {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .custom-multiselect .multiselect-dropdown .option-item {
+        padding: 0.5rem 0.75rem;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+    }
+
+    .custom-multiselect .multiselect-dropdown .option-item:hover {
+        background: #f8f9fc;
+    }
+
+    .custom-multiselect .multiselect-dropdown .option-item .checkbox {
+        width: 18px;
+        height: 18px;
+        border: 2px solid #dee2e6;
+        border-radius: 4px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        flex-shrink: 0;
+    }
+
+    .custom-multiselect .multiselect-dropdown .option-item .checkbox.checked {
+        background: #667eea;
+        border-color: #667eea;
+        color: white;
+    }
+
+    .custom-multiselect .multiselect-dropdown .option-item .checkbox.checked::after {
+        content: '✓';
+        font-size: 12px;
+    }
+
+    .custom-multiselect .multiselect-dropdown .option-item .status-color {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    /* Стили для скролла */
+    .custom-multiselect .multiselect-dropdown::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .custom-multiselect .multiselect-dropdown::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 10px;
+    }
+
+    .custom-multiselect .multiselect-dropdown::-webkit-scrollbar-thumb {
+        background: #c1c7cd;
+        border-radius: 10px;
+    }
+
+    .custom-multiselect .multiselect-dropdown::-webkit-scrollbar-thumb:hover {
+        background: #a8b0b8;
+    }
+
+    /* ===== КАРТОЧКИ ЗАКАЗОВ ===== */
+    .order-card {
+        background: white;
+        border-radius: 16px;
+        padding: 1.5rem 2rem;
+        margin-bottom: 1.25rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        transition: all 0.3s ease;
+        border-left: 5px solid #dee2e6;
+        position: relative;
+        overflow: visible;
+    }
+    .order-card .row {
+        position: relative;
+        z-index: 1;
+    }
+    .order-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 200px;
+        height: 200px;
+        background: radial-gradient(circle, rgba(102, 126, 234, 0.03) 0%, transparent 70%);
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 0;
+    }
+
+    .order-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 35px rgba(0,0,0,0.08);
+    }
+
+    .order-card.accepted { border-left-color: #667eea; }
+    .order-card.in_work { border-left-color: #17a2b8; }
+    .order-card.waiting_spareparts { border-left-color: #fd7e14; }
+    .order-card.ready { border-left-color: #28a745; }
+    .order-card.issued { border-left-color: #6c757d; }
+    .order-card.cancelled { border-left-color: #dc3545; }
+
+    .order-card .order-number {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #2c3e50;
+    }
+
+    .order-card .order-number a {
+        color: #2c3e50;
+        text-decoration: none;
+        transition: color 0.3s ease;
+    }
+
+    .order-card .order-number a:hover {
+        color: #667eea;
+    }
+
+    .order-card .order-meta {
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin-top: 0.25rem;
+    }
+
+    .order-card .order-meta i {
+        width: 1.25rem;
+        color: #adb5bd;
+    }
+
+    .order-card .order-total {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #2c3e50;
+    }
+
+    .order-card .order-total small {
+        font-size: 0.9rem;
+        font-weight: 400;
+        color: #6c757d;
+    }
+
+    /* ===== БЕЙДЖИ СТАТУСОВ ===== */
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.35rem 1rem;
+        border-radius: 50px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        border: none;
+        transition: all 0.3s ease;
+    }
+
+    .status-badge i {
+        font-size: 0.75rem;
+    }
+
+    .status-badge.status-accepted {
+        background: #e8edfd;
+        color: #667eea;
+    }
+
+    .status-badge.status-in_work {
+        background: #d1ecf1;
+        color: #0c5460;
+    }
+
+    .status-badge.status-waiting_spareparts {
+        background: #fff3cd;
+        color: #856404;
+    }
+
+    .status-badge.status-ready {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .status-badge.status-issued {
+        background: #e2e3e5;
+        color: #383d41;
+    }
+
+    .status-badge.status-cancelled {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    .order-actions {
+        position: relative;
+        z-index: 5;
+    }
+    .order-actions .btn-action {
+        position: relative;
+        border-radius: 50px;
+        z-index: 10;
+        padding: 0.3rem 0.9rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        border: none;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+
+    .order-actions .btn-action svg {
+        font-size: 0.75rem;
+    }
+
+    .order-actions .btn-action.btn-primary-action {
+        background: #667eea;
+        color: white;
+    }
+
+    .order-actions .btn-action.btn-primary-action:hover {
+        background: #5a6fd6;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        color: white;
+    }
+
+    .order-actions .btn-action.btn-success-action {
+        background: #28a745;
+        color: white;
+    }
+
+    .order-actions .btn-action.btn-success-action:hover {
+        background: #218838;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
+        color: white;
+    }
+
+    .order-actions .btn-action.btn-warning-action {
+        background: #ffc107;
+        color: #212529;
+    }
+
+    .order-actions .btn-action.btn-warning-action:hover {
+        background: #e0a800;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(255, 193, 7, 0.4);
+        color: #212529;
+    }
+
+    .order-actions .btn-action.btn-outline-action {
+        background: transparent;
+        border: 2px solid #e9ecef;
+        color: #6c757d;
+        padding: 0.2rem 0.7rem;
+    }
+
+    .order-actions .btn-action.btn-outline-action:hover {
+        background: #f8f9fa;
+        border-color: #dee2e6;
+        color: #2c3e50;
+    }
+
+    .order-actions .btn-action.btn-danger-action {
+        background: #dc3545;
+        color: white;
+    }
+
+    .order-actions .btn-action.btn-danger-action:hover {
+        background: #c82333;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(220, 53, 69, 0.4);
+        color: white;
+    }
+
+
+    .dropdown-menu-custom {
+        border: none;
+        border-radius: 16px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+        padding: 0.5rem;
+        min-width: 200px;
+        z-index: 1050 !important; /* Повышаем z-index */
+        position: absolute;
+        margin-top: 0.5rem;
+    }
+
+    .dropdown-menu-custom .dropdown-item {
+        border-radius: 10px;
+        padding: 0.5rem 1rem;
+        font-size: 0.85rem;
+        transition: all 0.2s ease;
+    }
+
+    .dropdown-menu-custom .dropdown-item:hover {
+        background: #f8f9fc;
+    }
+
+    .dropdown-menu-custom .dropdown-item i {
+        width: 1.25rem;
+        color: #6c757d;
+    }
+
+    .dropdown-menu-custom .dropdown-item.text-danger i {
+        color: #dc3545;
+    }
+
+    .dropdown-menu-custom .dropdown-divider {
+        margin: 0.25rem 0;
+    }
+
+    /* ===== ПАГИНАЦИЯ ===== */
+    .pagination-custom {
+        display: flex;
+        justify-content: center;
+        gap: 0.25rem;
+        margin-top: 2rem;
+    }
+
+    .pagination-custom .page-link {
+        border: none;
+        border-radius: 12px;
+        padding: 0.5rem 1rem;
+        color: #2c3e50;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        background: white;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+    }
+
+    .pagination-custom .page-link:hover {
+        background: #667eea;
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .pagination-custom .page-item.active .page-link {
+        background: var(--primary-gradient);
+        color: white;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .pagination-custom .page-item.disabled .page-link {
+        color: #adb5bd;
+        background: #f8f9fa;
+        cursor: not-allowed;
+    }
+
+    /* ===== ПУСТОЕ СОСТОЯНИЕ ===== */
+    .empty-state {
+        background: white;
+        border-radius: 16px;
+        padding: 4rem 2rem;
+        text-align: center;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+
+    .empty-state i {
+        font-size: 4rem;
+        color: #dee2e6;
+        margin-bottom: 1rem;
+    }
+
+    .empty-state h5 {
+        color: #2c3e50;
+        font-weight: 600;
+    }
+
+    .empty-state p {
+        color: #6c757d;
+        max-width: 400px;
+        margin: 0 auto 1.5rem;
+    }
+
+    /* ===== АДАПТИВНОСТЬ ===== */
+    @media (max-width: 992px) {
+        .page-header {
+            padding: 1rem 1.5rem;
+        }
+        .page-title {
+            font-size: 1.4rem;
+        }
+        .filter-bar {
+            padding: 1rem 1.5rem;
+        }
+        .order-card {
+            padding: 1.25rem;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+        }
+        .stats-card .stats-number {
+            font-size: 1.5rem;
+        }
+        .order-card .order-total {
+            font-size: 1.2rem;
+        }
+        .order-actions {
+            margin-top: 0.75rem;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .stats-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+        .page-header {
+            flex-direction: column;
+            align-items: stretch;
+            text-align: center;
+        }
+        .page-title {
+            font-size: 1.2rem;
+        }
+        .order-card {
+            padding: 1rem;
+        }
+        .order-card .order-number {
+            font-size: 1rem;
+        }
+        .pagination-custom .page-link {
+            padding: 0.3rem 0.7rem;
+            font-size: 0.8rem;
+        }
+        .custom-multiselect .multiselect-dropdown {
+            position: fixed;
+            top: auto;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            border-radius: 16px 16px 0 0;
+            max-height: 50vh;
+            border: none;
+            box-shadow: 0 -5px 30px rgba(0,0,0,0.15);
         }
     }
 </style>
 {% endblock %}
 
 {% block body %}
-<div class="messages">
-    {% if messages %}
-        {% for message in messages %}
-            <!-- Error Messages -->
-            {% if message.level == DEFAULT_MESSAGE_LEVELS.ERROR %}
-                <div class="alert alert-danger alert-dismissible fade show mt-2" role="alert">
-                    <strong>{{ message }}</strong>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            <!-- Success Messages -->
-            {% elif message.level == DEFAULT_MESSAGE_LEVELS.SUCCESS %}
-                <div class="alert alert-success alert-dismissible fade show mt-2" role="alert">
+<div class="page-wrapper">
+    <div class="container-fluid px-3 px-md-4">
+
+        <!-- Сообщения -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show mb-3" role="alert" style="border-radius: 12px; border: none; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+                    <i class="fas {% if message.tags == 'success' %}fa-check-circle{% elif message.tags == 'error' %}fa-exclamation-circle{% else %}fa-info-circle{% endif %} me-2"></i>
                     {{ message }}
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
-            {% endif %}
-        {% endfor %}
-    {% endif %}
-</div>
+            {% endfor %}
+        {% endif %}
 
+        <!-- Заголовок -->
+        <div class="page-header">
+            <h1 class="page-title">
+                <i class="fas fa-clipboard-list"></i>Заказы
+            </h1>
+            <a href="{% url 'create_order' %}" class="btn-create">
+                <i class="fas fa-plus me-2"></i>Новый заказ
+            </a>
+        </div>
 
-
-<div class="container-fluid py-4">
-    <!-- Заголовок -->
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-        <h2 class="mb-0">
-            <i class="fas fa-clipboard-list me-2 text-primary"></i>Заказы
-        </h2>
-        <a href="{% url 'create_order' %}" class="btn btn-primary">
-            <i class="fas fa-plus me-1"></i>Новый заказ
-        </a>
-    </div>
-
-    <!-- Статистика -->
-    {% if admin %}
-    <div class="row mb-4">
-        <div class="col-md-3 col-sm-6">
-            <div class="stats-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+        <!-- Статистика -->
+        {% if admin %}
+        <div class="stats-grid">
+            <div class="stats-card">
+                <i class="fas fa-clipboard-list stats-icon"></i>
                 <div class="stats-number">{{ total_orders }}</div>
                 <div class="stats-label">Всего заказов</div>
             </div>
-        </div>
-        <div class="col-md-3 col-sm-6">
-            <div class="stats-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+            <div class="stats-card primary">
+                <i class="fas fa-inbox stats-icon"></i>
+                <div class="stats-number">{{ accepted_count }}</div>
+                <div class="stats-label">Новых</div>
+            </div>
+            <div class="stats-card danger">
+                <i class="fas fa-tools stats-icon"></i>
                 <div class="stats-number">{{ in_work_count }}</div>
                 <div class="stats-label">В работе</div>
             </div>
-        </div>
-        <div class="col-md-3 col-sm-6">
-            <div class="stats-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+            <div class="stats-card success">
+                <i class="fas fa-check-circle stats-icon"></i>
                 <div class="stats-number">{{ ready_count }}</div>
                 <div class="stats-label">Готовых</div>
             </div>
-        </div>
-        <div class="col-md-3 col-sm-6">
-            <div class="stats-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
-                <div class="stats-number">{{ total_revenue|floatformat:0 }} ₽</div>
-                <div class="stats-label">Выручка</div>
+            <div class="stats-card warning">
+                <i class="fas fa-clock stats-icon"></i>
+                <div class="stats-number">{{ waiting_spareparts_count }}</div>
+                <div class="stats-label">Ожидают запчасти</div>
+            </div>
+            <div class="stats-card dark">
+                <i class="fas fa-truck stats-icon"></i>
+                <div class="stats-number">{{ issued_count }}</div>
+                <div class="stats-label">Выдано</div>
+            </div>
+            <div class="stats-card info">
+                <i class="fas fa-ruble-sign stats-icon"></i>
+                <div class="stats-number">{{ total_revenue|floatformat:0 }}</div>
+                <div class="stats-label">Общая выручка</div>
             </div>
         </div>
-    </div>
-    {% endif %}
-    <!-- Панель фильтров -->
-    <div class="filter-bar">
-        <form method="get" class="row g-3">
-            <div class="col-md-4">
-                <div class="position-relative">
-                    <i class="fas fa-search search-icon"></i>
-                    <input type="text" name="search" class="form-control search-input"
-                           placeholder="Поиск по номеру, клиенту или технике..."
-                           value="{{ request.GET.search|default:'' }}">
-                </div>
-            </div>
-            <div class="col-md-3">
-                <select name="status" class="form-select">
-                    <option value="">Все статусы</option>
-                    <option value="accepted" {% if request.GET.status == 'accepted' %}selected{% endif %}>Новый</option>
-                    <option value="in_work" {% if request.GET.status == 'in_work' %}selected{% endif %}>В работе</option>
-                    <option value="waiting_spareparts" {% if request.GET.status == 'waiting_spareparts' %}selected{% endif %}>Ждет запчастей</option>
-                    <option value="ready" {% if request.GET.status == 'ready' %}selected{% endif %}>Готов</option>
-                    <option value="issued" {% if request.GET.status == 'issued' %}selected{% endif %}>Выдан</option>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <select name="employee" class="form-select">
-                    <option value="">Все сотрудники</option>
-                    {% for tech in technicians %}
-                        <option value="{{ tech.id }}">{{ tech.get_full_name|default:tech.username }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-3">
-                <select name="sort" class="form-select">
-                    <option value="-created_at" {% if request.GET.sort == '-created_at' or not request.GET.sort %}selected{% endif %}>
-                        По дате создания (новые)
-                    </option>
-                    <option value="created_at" {% if request.GET.sort == 'created_at' %}selected{% endif %}>
-                        По дате создания (старые)
-                    </option>
-                    <option value="-completed_at" {% if request.GET.sort == '-completed_at' %}selected{% endif %}>
-                        По дате завершения (новые)
-                    </option>
-                    <option value="completed_at" {% if request.GET.sort == 'completed_at' %}selected{% endif %}>
-                        По дате завершения (старые)
-                    </option>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <input type="date" name="date_from" class="form-control" placeholder="С даты"
-                       value="{{ request.GET.date_from|default:'' }}">
-            </div>
-            <div class="col-md-2">
-                <button type="submit" class="btn btn-primary w-100">
-                    <i class="fas fa-filter me-1"></i>Применить
-                </button>
-            </div>
-        </form>
-    </div>
+        {% endif %}
 
-    <!-- Список заказов (карточки) -->
-    {% if orders %}
-        {% for order in orders %}
-        <div class="card order-card {{ order.status }} mb-3">
-            <div class="card-body">
+        <!-- Фильтры -->
+        <div class="filter-bar">
+            <form method="get" id="filterForm">
+                <div class="row g-3">
+                    <!-- Поиск -->
+                    <div class="col-lg-3 col-md-6">
+                        <div class="search-wrapper">
+                            <i class="fas fa-search search-icon"></i>
+                            <input type="text" name="search" class="form-control"
+                                   placeholder="Поиск по номеру, клиенту или технике..."
+                                   value="{{ request.GET.search|default:'' }}">
+                        </div>
+                    </div>
+
+                    <!-- Статусы (кастомный мультиселект) -->
+                    <div class="col-lg-3 col-md-6">
+                        <div class="custom-multiselect" id="statusMultiselect">
+                            <div class="multiselect-display" id="multiselectDisplay">
+                                <span class="placeholder" id="multiselectPlaceholder">Выберите статусы</span>
+                                <span class="arrow" id="multiselectArrow">▼</span>
+                            </div>
+                            <div class="multiselect-dropdown" id="multiselectDropdown">
+                                <div class="option-item" data-value="accepted">
+                                    <span class="checkbox"></span>
+                                    <span class="status-color" style="background: #667eea;"></span>
+                                    🆕 Новый
+                                </div>
+                                <div class="option-item" data-value="in_work">
+                                    <span class="checkbox"></span>
+                                    <span class="status-color" style="background: #17a2b8;"></span>
+                                    🔄 В работе
+                                </div>
+                                <div class="option-item" data-value="waiting_spareparts">
+                                    <span class="checkbox"></span>
+                                    <span class="status-color" style="background: #fd7e14;"></span>
+                                    ⏳ Ожидает запчасти
+                                </div>
+                                <div class="option-item" data-value="ready">
+                                    <span class="checkbox"></span>
+                                    <span class="status-color" style="background: #28a745;"></span>
+                                    ✅ Готов
+                                </div>
+                                <div class="option-item" data-value="issued">
+                                    <span class="checkbox"></span>
+                                    <span class="status-color" style="background: #6c757d;"></span>
+                                    📦 Выдан
+                                </div>
+                                <div class="option-item" data-value="cancelled">
+                                    <span class="checkbox"></span>
+                                    <span class="status-color" style="background: #dc3545;"></span>
+                                    ❌ Отменен
+                                </div>
+                            </div>
+                            <!-- Скрытый инпут для отправки формы -->
+                            <input type="hidden" name="status" id="statusInput" value="{{ request.GET.status|default:'' }}">
+                        </div>
+                    </div>
+
+                    <!-- Сотрудник -->
+                    <div class="col-lg-2 col-md-6">
+                        <select name="employee" class="form-select">
+                            <option value="">Все сотрудники</option>
+                            {% for tech in technicians %}
+                                <option value="{{ tech.id }}" {% if request.GET.employee|add:"0" == tech.id %}selected{% endif %}>
+                                    {{ tech.get_full_name|default:tech.username }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Сортировка -->
+                    <div class="col-lg-2 col-md-6">
+                        <select name="sort" class="form-select">
+                            <option value="-created_at" {% if request.GET.sort == '-created_at' or not request.GET.sort %}selected{% endif %}>
+                                📅 Новые сначала
+                            </option>
+                            <option value="created_at" {% if request.GET.sort == 'created_at' %}selected{% endif %}>
+                                📅 Старые сначала
+                            </option>
+                            <option value="-completed_at" {% if request.GET.sort == '-completed_at' %}selected{% endif %}>
+                                ✅ Завершенные сначала
+                            </option>
+                            <option value="completed_at" {% if request.GET.sort == 'completed_at' %}selected{% endif %}>
+                                ⏳ Незавершенные сначала
+                            </option>
+                        </select>
+                    </div>
+
+                    <!-- Дата от -->
+                    <div class="col-lg-2 col-md-6">
+                        <input type="date" name="date_from" class="form-control"
+                               placeholder="С даты" value="{{ request.GET.date_from|default:'' }}">
+                    </div>
+
+                    <!-- Дата до -->
+                    <div class="col-lg-2 col-md-6">
+                        <input type="date" name="date_to" class="form-control"
+                               placeholder="По дату" value="{{ request.GET.date_to|default:'' }}">
+                    </div>
+
+                    <!-- Кнопки -->
+                    <div class="col-lg-2 col-md-12">
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-filter flex-grow-1">
+                                <i class="fas fa-sliders-h me-2"></i>Применить
+                            </button>
+                            <a href="{% url 'orders' %}" class="btn btn-reset">
+                                <i class="fas fa-times"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        {% if orders %}
+            {% for order in orders %}
+            <div class="order-card {{ order.status }}">
                 <div class="row align-items-center">
                     <!-- Основная информация -->
-                    <div class="col-md-4">
+                    <div class="col-lg-4 col-md-12">
                         <div class="order-number">
-                            <a href="{% url 'order_detail' order.id %}" class="text-decoration-none">
+                            <a href="{% url 'order_detail' order.id %}">
                                 Заказ №{{ order.id }}
                             </a>
                         </div>
-                        <div class="order-meta mt-1">
-                            <i class="far fa-calendar-alt me-1"></i>{{ order.created_at|date:"d.m.Y H:i" }}
+                        <div class="order-meta">
+                            <i class="far fa-calendar-alt"></i>
+                            {{ order.created_at|date:"d.m.Y H:i" }}
+                            {% if order.completed_at %}
+                                <span class="text-muted">(завершен {{ order.completed_at|date:"d.m.Y" }})</span>
+                            {% endif %}
                         </div>
                         <div class="order-meta">
-                            <i class="fas fa-user me-1"></i>{{ order.customer.name|default:"—" }}
+                            <i class="fas fa-user"></i>
+                            {{ order.customer.name|default:"Не указан" }}
                         </div>
                         <div class="order-meta">
-                            <i class="fas fa-bicycle me-1"></i>{{ order.transport.name|default:"—" }}
+                            <i class="fas fa-bicycle"></i>
+                            {{ order.transport.name|default:"Не указан" }}
                             {% if order.transport.serial_number %}
                                 <span class="text-muted">(SN: {{ order.transport.serial_number }})</span>
                             {% endif %}
                         </div>
                     </div>
 
-                    <!-- Сотрудник и статус -->
-                    <div class="col-md-3">
+                    <!-- Статус и сотрудник -->
+                    <div class="col-lg-3 col-md-6">
                         <div class="order-meta">
-                            <i class="fas fa-user-cog me-1"></i>
-                            {{ order.employee.first_name }}
+                            <i class="fas fa-user-cog"></i>
+                            {{ order.employee.get_full_name|default:order.employee.username|default:"Не назначен" }}
                         </div>
                         <div class="mt-2">
-                            {% if order.status == 'in_work' %}
-                                <span class="status-badge bg-info ">🔄 В работе</span>
+                            {% if order.status == 'accepted' %}
+                                <span class="status-badge status-accepted"><i class="fas fa-inbox"></i>Новый</span>
+                            {% elif order.status == 'in_work' %}
+                                <span class="status-badge status-in_work"><i class="fas fa-tools"></i>В работе</span>
                             {% elif order.status == 'waiting_spareparts' %}
-                                <span class="status-badge bg-warning">⏳ Ожидает запчасти</span>
+                                <span class="status-badge status-waiting_spareparts"><i class="fas fa-clock"></i>Ожидает запчасти</span>
                             {% elif order.status == 'ready' %}
-                                <span class="status-badge bg-success text-white">✅ Готов</span>
-                            {% elif order.status == 'accepted' %}
-                                <span class="status-badge bg-primary text-white">🆕 Новый</span>
+                                <span class="status-badge status-ready"><i class="fas fa-check-circle"></i>Готов</span>
+                            {% elif order.status == 'issued' %}
+                                <span class="status-badge status-issued"><i class="fas fa-hand-peace"></i>Выдан</span>
                             {% elif order.status == 'cancelled' %}
-                                <span class="status-badge bg-danger text-white">Отменен</span>
-                            {% else %}
-                                <span class="status-badge bg-secondary">📁 Выдан</span>
+                                <span class="status-badge status-cancelled"><i class="fas fa-times-circle"></i>Отменен</span>
                             {% endif %}
                         </div>
                     </div>
 
                     <!-- Сумма и позиции -->
-                    <div class="col-md-3">
+                    <div class="col-lg-2 col-md-6">
                         <div class="order-total">
-                            {{ order.total|floatformat:2 }} ₽
+                            {{ order.total|floatformat:2 }} <small>₽</small>
                         </div>
                         <div class="order-meta">
-                            <i class="fas fa-boxes me-1"></i>{{ order.order_items.count }} позиций
+                            <i class="fas fa-boxes"></i>
+                            {{ order.order_items.count }} позиций
                         </div>
                     </div>
 
                     <!-- Действия -->
-                    <div class="col-md-2 text-md-end">
-                        {% if order.status != 'issued' or admin %}
-                        <div class="btn-group" role="group">
-                            <a href="{% url 'order_detail' order.id %}" class="btn btn-sm btn-outline-primary" title="Просмотр">
-                                <i class="fas fa-eye"></i>
-                            </a>
-
-                            <a href="{% url 'edit_order' order.id %}" class="btn btn-sm btn-outline-secondary" title="Редактировать">
-                                <i class="fas fa-edit"></i>
-                            </a>
-                            <button type="button" class="btn btn-sm btn-outline-danger"
-                                    onclick="if(confirm('Отменить заказ №{{ order.id }}?')) window.location.href='{% url 'cancel_order_update' order.id %}'"
-                                    title="Отменить">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
-                        {% endif %}
-                        <div class="mt-2">
+                    <div class="col-lg-3 col-md-12">
+                        <div class="order-actions d-flex flex-wrap align-items-center gap-2">
+                            <!-- Быстрые действия -->
                             {% if order.status == 'accepted' or order.status == 'waiting_spareparts' %}
-                            <button type="button" class="btn btn-warning"
-                                    onclick="window.location.href='{% url 'change_order_status' order.id %}?status=in_work'">
-                                <i class="fa-solid fa-screwdriver-wrench me-1"></i>В работу
-                            </button>
+                                <a href="{% url 'change_order_status' order.id %}?status=in_work"
+                                   class="btn-action btn-warning-action">
+                                    <i class="fa-solid fa-screwdriver-wrench"></i>В работу
+                                </a>
                             {% elif order.status == 'in_work' %}
-                            <button type="button" class="btn btn-success"
-                                    onclick="window.location.href='{% url 'change_order_status' order.id %}?status=ready'">
-                                <i class="fas fa-check me-1"></i>Готов
-                            </button>
+                                <a href="{% url 'change_order_status' order.id %}?status=ready"
+                                   class="btn-action btn-success-action">
+                                    <i class="fas fa-check"></i>Готов
+                                </a>
                             {% elif order.status == 'ready' %}
-                            <button type="button" class="btn btn-primary"
-                                    onclick="window.location.href='{% url 'change_order_status' order.id %}?status=issued'">
-                                <i class="fa-solid fa-box me-1"></i>Завершить
-                            </button>
+                                <a href="{% url 'change_order_status' order.id %}?status=issued"
+                                   class="btn-action btn-primary-action">
+                                    <i class="fa-solid fa-box"></i>Выдать
+                                </a>
                             {% endif %}
 
-                            {% if order.status != 'issued' %}
+                            <!-- Кнопки просмотра и редактирования -->
+                            <div class="btn-group" role="group">
+                                <a href="{% url 'order_detail' order.id %}" class="btn-action btn-outline-action" title="Просмотр">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{% url 'edit_order' order.id %}" class="btn-action btn-outline-action" title="Редактировать">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                {% if order.status != 'issued' and order.status != 'cancelled' %}
+                                    <a href="{% url 'cancel_order_update' order.id %}"
+                                       class="btn-action btn-danger-action"
+                                       onclick="return confirm('Отменить заказ №{{ order.id }}? Запчасти будут возвращены на склад.')"
+                                       title="Отменить">
+                                        <i class="fas fa-times"></i>
+                                    </a>
+                                {% endif %}
+                            </div>
+
+                            <!-- Меню смены статуса -->
+                            {% if order.status != 'issued' and order.status != 'cancelled' %}
                             <div class="btn-group">
-                                <button type="button" class="btn btn-outline-secondary dropdown-toggle"
-                                        data-bs-toggle="dropdown" aria-expanded="false">
-                                    <i class="fas fa-chevron-down me-1"></i>Сменить статус
+                                <button type="button" class="btn-action btn-outline-action dropdown-toggle"
+                                        data-bs-toggle="dropdown" aria-expanded="false"
+                                        id="dropdownMenuButton{{ order.id }}">
+                                    <i class="fas fa-chevron-down"></i>
                                 </button>
-                                <ul class="dropdown-menu dropdown-menu-end">
+                                <ul class="dropdown-menu dropdown-menu-custom dropdown-menu-end"
+                                    aria-labelledby="dropdownMenuButton{{ order.id }}"
+                                    data-bs-popper="static">
                                     <li>
                                         <a class="dropdown-item {% if order.status == 'accepted' %}disabled{% endif %}"
                                            href="{% url 'change_order_status' order.id %}?status=accepted">
-                                            <i class="fas fa-inbox me-2"></i>Принят
+                                            <i class="fas fa-inbox"></i>Принят
                                         </a>
                                     </li>
                                     <li>
                                         <a class="dropdown-item {% if order.status == 'in_work' %}disabled{% endif %}"
                                            href="{% url 'change_order_status' order.id %}?status=in_work">
-                                            <i class="fas fa-tools me-2"></i>В работу
+                                            <i class="fas fa-tools"></i>В работу
                                         </a>
                                     </li>
                                     <li>
                                         <a class="dropdown-item {% if order.status == 'waiting_spareparts' %}disabled{% endif %}"
                                            href="{% url 'change_order_status' order.id %}?status=waiting_spareparts">
-                                            <i class="fas fa-clock me-2"></i>Ожидает запчасти
+                                            <i class="fas fa-clock"></i>Ожидает запчасти
                                         </a>
                                     </li>
                                     <li>
                                         <a class="dropdown-item {% if order.status == 'ready' %}disabled{% endif %}"
                                            href="{% url 'change_order_status' order.id %}?status=ready">
-                                            <i class="fas fa-check-circle me-2"></i>Готов
+                                            <i class="fas fa-check-circle"></i>Готов
                                         </a>
                                     </li>
                                     <li>
                                         <a class="dropdown-item {% if order.status == 'issued' %}disabled{% endif %}"
                                            href="{% url 'change_order_status' order.id %}?status=issued">
-                                            <i class="fas fa-hand-peace me-2"></i>Выдан
+                                            <i class="fas fa-hand-peace"></i>Выдан
                                         </a>
                                     </li>
                                     <li><hr class="dropdown-divider"></li>
@@ -344,7 +1093,7 @@
                                         <a class="dropdown-item text-danger"
                                            href="{% url 'cancel_order_update' order.id %}"
                                            onclick="return confirm('Отменить заказ №{{ order.id }}? Запчасти будут возвращены на склад.')">
-                                            <i class="fas fa-times-circle me-2"></i>Отменить заказ
+                                            <i class="fas fa-times-circle"></i>Отменить заказ
                                         </a>
                                     </li>
                                 </ul>
@@ -354,56 +1103,198 @@
                     </div>
                 </div>
             </div>
-        </div>
-        {% endfor %}
+            {% endfor %}
 
-        <!-- Пагинация -->
-        {% if is_paginated %}
-        <nav aria-label="Page navigation" class="mt-4">
-            <ul class="pagination justify-content-center">
-                {% if page_obj.has_previous %}
-                    <li class="page-item">
-                        <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
-                            <i class="fas fa-angle-double-left"></i>
-                        </a>
-                    </li>
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
-                            <i class="fas fa-angle-left"></i>
-                        </a>
-                    </li>
-                {% endif %}
+            <!-- Пагинация -->
+            {% if is_paginated %}
+            <nav aria-label="Page navigation">
+                <ul class="pagination-custom">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                <i class="fas fa-angle-double-left"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                <i class="fas fa-angle-left"></i>
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link"><i class="fas fa-angle-double-left"></i></span>
+                        </li>
+                        <li class="page-item disabled">
+                            <span class="page-link"><i class="fas fa-angle-left"></i></span>
+                        </li>
+                    {% endif %}
 
-                <li class="page-item active">
-                    <span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
-                </li>
+                    <li class="page-item active">
+                        <span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+                    </li>
 
-                {% if page_obj.has_next %}
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
-                            <i class="fas fa-angle-right"></i>
-                        </a>
-                    </li>
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
-                            <i class="fas fa-angle-double-right"></i>
-                        </a>
-                    </li>
-                {% endif %}
-            </ul>
-        </nav>
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                <i class="fas fa-angle-right"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                <i class="fas fa-angle-double-right"></i>
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link"><i class="fas fa-angle-right"></i></span>
+                        </li>
+                        <li class="page-item disabled">
+                            <span class="page-link"><i class="fas fa-angle-double-right"></i></span>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+
+        {% else %}
+            <!-- Пустое состояние -->
+            <div class="empty-state">
+                <i class="fas fa-inbox"></i>
+                <h5>Нет заказов</h5>
+                <p>Создайте первый заказ, нажав кнопку "Новый заказ" выше</p>
+                <a href="{% url 'create_order' %}" class="btn-create">
+                    <i class="fas fa-plus me-2"></i>Создать заказ
+                </a>
+            </div>
         {% endif %}
 
-    {% else %}
-        <div class="text-center py-5">
-            <i class="fas fa-inbox fa-4x text-muted mb-3"></i>
-            <h5 class="text-muted">Нет заказов</h5>
-            <p class="text-muted">Создайте первый заказ, нажав кнопку "Новый заказ"</p>
-            <a href="{% url 'create_order' %}" class="btn btn-primary mt-2">
-                <i class="fas fa-plus me-1"></i>Создать заказ
-            </a>
-        </div>
-    {% endif %}
+    </div>
 </div>
-{% endblock body %}
 
+<!-- JavaScript -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const multiselect = document.getElementById('statusMultiselect');
+    const display = document.getElementById('multiselectDisplay');
+    const dropdown = document.getElementById('multiselectDropdown');
+    const arrow = document.getElementById('multiselectArrow');
+    const placeholder = document.getElementById('multiselectPlaceholder');
+    const statusInput = document.getElementById('statusInput');
+
+    const statusMap = {
+        'accepted': '🆕 Новый',
+        'in_work': '🔄 В работе',
+        'waiting_spareparts': '⏳ Ожидает запчасти',
+        'ready': '✅ Готов',
+        'issued': '📦 Выдан',
+        'cancelled': '❌ Отменен'
+    };
+
+    const colorMap = {
+        'accepted': '#667eea',
+        'in_work': '#17a2b8',
+        'waiting_spareparts': '#fd7e14',
+        'ready': '#28a745',
+        'issued': '#6c757d',
+        'cancelled': '#dc3545'
+    };
+
+    // Получаем выбранные статусы из URL
+    let selectedStatuses = [];
+    const urlParams = new URLSearchParams(window.location.search);
+    const statusParam = urlParams.get('status');
+    if (statusParam) {
+        selectedStatuses = statusParam.split(',').filter(s => s);
+    }
+
+    // Функция для обновления отображения
+    function updateDisplay() {
+        // Обновляем чекбоксы
+        document.querySelectorAll('.option-item').forEach(item => {
+            const value = item.dataset.value;
+            const checkbox = item.querySelector('.checkbox');
+            if (selectedStatuses.includes(value)) {
+                checkbox.classList.add('checked');
+            } else {
+                checkbox.classList.remove('checked');
+            }
+        });
+
+        // Обновляем плейсхолдер и теги
+        if (selectedStatuses.length === 0) {
+            placeholder.style.display = 'inline';
+            // Удаляем все теги
+            display.querySelectorAll('.selected-tag').forEach(tag => tag.remove());
+        } else {
+            placeholder.style.display = 'none';
+            // Удаляем старые теги
+            display.querySelectorAll('.selected-tag').forEach(tag => tag.remove());
+            // Добавляем новые теги
+            selectedStatuses.forEach(value => {
+                const tag = document.createElement('span');
+                tag.className = 'selected-tag';
+                tag.innerHTML = `
+                    ${statusMap[value] || value}
+                    <span class="remove-tag" data-value="${value}">×</span>
+                `;
+                tag.style.background = colorMap[value] || '#667eea';
+                display.insertBefore(tag, placeholder);
+            });
+        }
+
+        // Обновляем скрытый инпут
+        statusInput.value = selectedStatuses.join(',');
+    }
+
+    // Обработчик клика по опции
+    document.querySelectorAll('.option-item').forEach(item => {
+        item.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const value = this.dataset.value;
+            const index = selectedStatuses.indexOf(value);
+            if (index > -1) {
+                selectedStatuses.splice(index, 1);
+            } else {
+                selectedStatuses.push(value);
+            }
+            updateDisplay();
+            // Автоматически отправляем форму
+            document.getElementById('filterForm').submit();
+        });
+    });
+
+    // Удаление тега
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-tag')) {
+            e.stopPropagation();
+            const value = e.target.dataset.value;
+            const index = selectedStatuses.indexOf(value);
+            if (index > -1) {
+                selectedStatuses.splice(index, 1);
+            }
+            updateDisplay();
+            document.getElementById('filterForm').submit();
+        }
+    });
+
+    // Toggle dropdown
+    display.addEventListener('click', function(e) {
+        e.stopPropagation();
+        dropdown.classList.toggle('open');
+        arrow.classList.toggle('open');
+    });
+
+    // Закрытие dropdown при клике вне
+    document.addEventListener('click', function(e) {
+        if (!multiselect.contains(e.target)) {
+            dropdown.classList.remove('open');
+            arrow.classList.remove('open');
+        }
+    });
+
+    // Инициализация
+    updateDisplay();
+});
+</script>
+
+{% endblock %}
