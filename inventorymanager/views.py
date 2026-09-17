@@ -1,11 +1,13 @@
 import base64
 import os
+import tempfile
 from calendar import monthrange
 from datetime import timedelta, datetime, date
 from decimal import Decimal
 from io import BytesIO
+from PIL import Image
 
-import qrcode
+import segno
 from dateutil.relativedelta import relativedelta
 from django.core.paginator import Paginator
 from django.shortcuts import render, redirect, get_object_or_404
@@ -559,8 +561,6 @@ def get_technician_orders(request):
     try:
         User = get_user_model()
         technician = User.objects.get(id=technician_id)
-
-        # Получаем период
         start_date, end_date = get_period_range(period, selected_date)
 
         # Получаем процент техника
@@ -572,7 +572,6 @@ def get_technician_orders(request):
         except:
             percent = 40
 
-        # Получаем заказы техника за период
         orders = get_technician_orders_with_salary(
             technician=technician,
             start_date=start_date,
@@ -584,10 +583,10 @@ def get_technician_orders(request):
         orders_data = []
         for order in orders:
             technician_share = order.services_after_discount * Decimal(percent / 100)
-
             orders_data.append({
                 'id': order.id,
                 'number': f'№{order.id}',
+                'url': reverse('order_detail', args=[order.id]),
                 'client': order.customer.name,
                 'total': float(order.total),
                 'services_amount': float(order.services_total_after_discount),
@@ -1276,25 +1275,25 @@ def create_order(request):
 
 @login_required
 def print_label(request, order_id):
-    """Страница для печати этикетки с QR-кодом"""
     order = get_object_or_404(Order, id=order_id)
     uri = order.get_absolute_url()
     qr_data = DOMAIN + uri
-    qr = qrcode.QRCode(
-        version=3,
-        error_correction=qrcode.constants.ERROR_CORRECT_H,
-        box_size=9,
-        border=1,
-    )
-    qr.add_data(qr_data)
-    qr.make(fit=True)
-
-    qr_img = qr.make_image(fill_color="black", back_color="white").convert('RGB')
+    qrcode = segno.make(qr_data, error='h')
+    qr_img = qrcode.to_pil(scale=8)
+    logo_path = os.path.join(BASE_DIR, 'inventory_system/static/inventorymanager/img/logo_bw.jpg')
+    logo = Image.open(logo_path).convert('RGBA')
     qr_size = qr_img.size[0]
+    logo_size = int(qr_size * 0.3)
+    logo = logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
+    position = ((qr_size - logo_size) // 2, (qr_size - logo_size) // 2)
 
+    qr_img.paste(logo, position, logo)
+
+    # Сохраняем
     buffer = BytesIO()
     qr_img.save(buffer, format='PNG')
     qr_base64 = base64.b64encode(buffer.getvalue()).decode()
+    buffer.close()
     context = {
         'order': order,
         'qr_base64': qr_base64,

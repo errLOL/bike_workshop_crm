@@ -184,7 +184,7 @@
                     <tbody>
                         {% for item in salary_data %}
                         <tr>
-                            <td>{{ forloop.counter }}</a></td>
+                            <td>{{ forloop.counter }}</td>
                             <td>
                                 <strong>{{ item.user.get_full_name|default:item.user.username }}</strong>
                                 <div class="small text-muted">{{ item.user.email }}</div>
@@ -256,7 +256,7 @@
                     <button type="button" class="btn btn-primary" onclick="window.print()">
                         <i class="fas fa-print me-1"></i>Печать
                     </button>
-                    <button type="button" class="btn btn-success" onclick="exportOrdersToExcel()">
+                    <button type="button" class="btn btn-success" onclick="exportOrdersToCSV()">
                         <i class="fas fa-file-excel me-1"></i>Экспорт
                     </button>
                 </div>
@@ -408,7 +408,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     // Функция показа заказов
     function showOrders(e) {
-        const element = e.originalTarget
+        const element = e.currentTarget
         const technicianId = element.dataset.technicianId;
         const technicianName = element.dataset.technicianName;
         const ordersCount = element.dataset.ordersCount;
@@ -488,7 +488,7 @@ document.addEventListener('DOMContentLoaded', function() {
             html += `
                 <tr>
                     <td>
-                        <a href="{% url 'order_detail' 0 %}".replace('0', order.id)
+                        <a href="${order.url}"
                            target="_blank"
                            class="text-primary text-decoration-none">
                             <i class="fas fa-external-link-alt me-1 small"></i>${order.number}
@@ -531,17 +531,13 @@ document.addEventListener('DOMContentLoaded', function() {
             `Всего заказов: ${totalOrders}, общая выручка: ${formatNumber(totalRevenue)} ₽, фонд зарплаты: ${formatNumber(totalSalary)} ₽`;
     }
 
-    // Функция форматирования чисел
     function formatNumber(num) {
         return Number(num).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
     }
 
-    // Функция экспорта в Excel
-    function exportOrdersToExcel() {
+    function exportOrdersToCsv() {
         const table = document.querySelector('#ordersTableContainer table');
         if (!table) return;
-
-        // Создаем CSV
         let csv = '№ заказа,Клиент,Сумма заказа,Сумма услуг,Доля техника,Дата завершения,Статус\n';
 
         table.querySelectorAll('tbody tr').forEach(row => {
@@ -568,8 +564,7 @@ document.addEventListener('DOMContentLoaded', function() {
         link.download = `заказы_${document.getElementById('ordersModalTitle').textContent.replace('Заказы техника: ', '')}.csv`;
         link.click();
     }
-    const show_order_links = document.querySelectorAll(".orders-link");
-    show_order_links.forEach((order_link, index) => {
+    document.querySelectorAll(".orders-link").forEach(order_link => {
         order_link.addEventListener('click', showOrders);
     });
 });

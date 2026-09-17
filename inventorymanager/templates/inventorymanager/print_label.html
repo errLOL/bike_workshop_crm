@@ -11,7 +11,6 @@
             box-sizing: border-box;
         }
 
-        /* Стили для экрана (кнопка + этикетка) */
         body {
             background: #f0f2f5;
             min-height: 100vh;
@@ -23,7 +22,6 @@
             padding: 20px;
         }
 
-        /* Контейнер для кнопки и этикетки */
         .page-container {
             display: flex;
             flex-direction: column;
@@ -33,7 +31,6 @@
             max-width: 400px;
         }
 
-        /* Кнопка печати */
         .print-btn {
             display: inline-block;
             padding: 12px 30px;
@@ -46,7 +43,7 @@
             text-decoration: none;
             box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
             transition: background 0.2s;
-            order: 1; /* Кнопка сверху */
+            order: 1;
         }
 
         .print-btn:hover {
@@ -57,34 +54,100 @@
             transform: scale(0.97);
         }
 
-        /* Ссылка назад */
         .back-link {
             color: #888;
             font-size: 13px;
             text-decoration: none;
-            order: 2; /* Ссылка под кнопкой */
+            order: 2;
         }
 
         .back-link:hover {
             color: #555;
         }
 
-        /* Этикетка (видна на экране как карточка) */
+        /* ======================================== */
+        /* ЭТИКЕТКА
+        /* ======================================== */
         .label {
             width: 58mm;
             height: 30mm;
             background: white;
             border-radius: 4px;
             box-shadow: 0 2px 12px rgba(0,0,0,0.15);
-            padding: 1mm;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            order: 3;
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+
+        /* Левая часть — вертикальный текст */
+        .label-left {
+            flex: 0 0 40%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-right: 1px solid #e0e0e0;
+            padding-left: 2mm;
+        }
+
+        .vertical-text {
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            font-size: 12px;
+            line-height: 1.3;
+            text-align: center;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 0.5px;
+            color: #333;
+        }
+
+        .vertical-text .info-line {
+            display: block;
+            padding: 1mm 0;
+        }
+
+        .vertical-text .info-line .label-text {
+            color: #999;
+            font-size: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .vertical-text .info-line .value-text {
+            color: #1a1a1a;
+            font-weight: bold;
+            font-size: 10px;
+        }
+
+        .vertical-text .info-line .value-text.phone {
+            font-size: 10px;
+            letter-spacing: 0.5px;
+        }
+
+        /* Разделитель между строками */
+        .vertical-text .divider {
+            display: block;
+            width: 1px;
+            height: 2mm;
+            background: #ddd;
+            margin: 0.5mm auto;
+        }
+
+        /* Правая часть — QR код */
+        .label-right {
+            flex: 1;
+            height: 100%;
             display: flex;
             align-items: center;
             justify-content: center;
-            order: 3; /* Этикетка после кнопок */
-            flex-shrink: 0;
+            position: relative;
         }
 
-        .label .qr-wrapper {
+        .label-right .qr-wrapper {
             width: 100%;
             height: 100%;
             display: flex;
@@ -93,34 +156,16 @@
             position: relative;
         }
 
-        .label .qr-wrapper img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
-
-        /* Логотип поверх QR */
-        .label .logo-overlay {
-            position: absolute;
-            width: 20%;
-            height: 20%;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
-        }
-
-        .label .logo-overlay img {
+        .label-right .qr-wrapper img {
             width: 100%;
             height: 100%;
             object-fit: contain;
         }
 
         /* ======================================== */
-        /* СТИЛИ ДЛЯ ПЕЧАТИ — всё лишнее скрыто */
+        /* СТИЛИ ДЛЯ ПЕЧАТИ */
         /* ======================================== */
         @media print {
-            /* Скрываем всё, что не этикетка */
             body {
                 background: white !important;
                 padding: 0 !important;
@@ -142,35 +187,42 @@
                 display: none !important;
             }
 
-            /* Сама этикетка при печати */
             .label {
                 width: 58mm !important;
                 height: 30mm !important;
                 border-radius: 0 !important;
                 box-shadow: none !important;
-                padding: 0 !important;
+                padding: 1.5mm !important;
                 margin: 0 !important;
                 display: flex !important;
+                flex-direction: row !important;
                 align-items: center !important;
-                justify-content: center !important;
                 background: white !important;
                 page-break-after: avoid;
                 page-break-inside: avoid;
             }
 
-            .label .qr-wrapper {
+            .label-left {
+                flex: 0 0 40% !important;
+                border-right: 1px solid #e0e0e0 !important;
+            }
+
+            .label-right {
+                flex: 1 !important;
+            }
+
+            .label-right .qr-wrapper {
                 width: 100% !important;
                 height: 100% !important;
             }
 
-            .label .qr-wrapper img {
+            .label-right .qr-wrapper img {
                 width: 100% !important;
                 height: 100% !important;
                 object-fit: contain !important;
             }
         }
 
-        /* Настройки страницы для печати */
         @page {
             size: 58mm 30mm;
             margin: 0;
@@ -188,15 +240,39 @@
             ← Вернуться к заказу #{{ order.id }}
         </a>
 
+        <!-- Этикетка -->
         <div class="label">
-            <div class="qr-wrapper">
-                <img src="data:image/png;base64,{{ qr_base64 }}" alt="QR-код заказа #{{ order.id }}">
+            <!-- Левая колонка с вертикальным текстом -->
+            <div class="label-left">
+                <div class="vertical-text">
+                    <span class="info-line">
+                        <span class="label-text">Заказ</span><br>
+                        <span class="value-text">#{{ order.id }}</span>
+                    </span>
+                    <span class="divider"></span>
+                    <span class="info-line">
+                        <span class="label-text">Клиент</span><br>
+                        <span class="value-text">{{ order.customer.name }}</span>
+                    </span>
+                    <span class="divider"></span>
+                    <span class="info-line">
+                        <span class="label-text">Телефон</span><br>
+                        <span class="value-text phone">{{ order.customer.phone }}</span>
+                    </span>
+                </div>
+            </div>
+
+            <!-- Правая колонка с QR кодом -->
+            <div class="label-right">
+                <div class="qr-wrapper">
+                    <img src="data:image/png;base64,{{ qr_base64 }}" alt="QR-код заказа #{{ order.id }}">
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        // Опционально: автопечать при загрузке (раскомментируйте, если нужно)
+        // Автопечать при загрузке (опционально)
         // window.onload = function() { setTimeout(window.print, 500); };
     </script>
 </body>
