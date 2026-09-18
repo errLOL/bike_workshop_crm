@@ -1,9 +1,7 @@
 import base64
 import os
-import tempfile
-from calendar import monthrange
+from collections import defaultdict
 from datetime import timedelta, datetime, date
-from decimal import Decimal
 from io import BytesIO
 from PIL import Image
 
@@ -15,14 +13,11 @@ from django.http import HttpResponse, JsonResponse
 from django.contrib.auth import authenticate, login, logout, get_user
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db import transaction
-from django.forms import inlineformset_factory
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods, require_POST
 
 from inventory_system.settings import DOMAIN, BASE_DIR
 from .decorators import require_order_access, require_admin, is_admin
-from .models import Order, OrderItem
 from .forms import *
 from django.db.models import Sum, F, Q, Count, Avg, ExpressionWrapper, DecimalField
 import json
@@ -1843,37 +1838,309 @@ def delete_category(request, id):
 @require_admin
 def cash_register_list(request):
     cash_register = CashRegister.objects.filter(is_active=True).first()
+    if not cash_register:
+        context = {
+            'transactions': [],
+            'page_obj': None,
+            'is_paginated': False,
+            'cash_register': None,
+            'total_income': 0,
+            'total_expense': 0,
+            'current_balance': 0,
+            'net_flow': 0,
+            'operation_type_filter': '',
+            'payment_method_filter': '',
+            'date_from': '',
+            'date_to': '',
+            'period_filter': 'month',
+            'cash_flow_data': {
+                'labels': [],
+                'income': [],
+                'expense': [],
+                'balance': [],
+                'income_by_method': [],
+                'expense_by_method': [],
+                'method_labels': [],
+            },
+        }
 
-    transactions = CashTransaction.objects.filter(
-        cash_register=cash_register
-    ).select_related('order', 'employee').order_by('-created_at')
+        return render(
+            request,
+            'inventorymanager/cash_register_modern.html',
+            context
+        )
+    operation_type = request.GET.get('operation_type', '').strip()
+    payment_method = request.GET.get('payment_method', '').strip()
+    date_from_str = request.GET.get('date_from', '').strip()
+    date_to_str = request.GET.get('date_to', '').strip()
 
-    # Фильтры
-    operation_type = request.GET.get('operation_type', '')
+    transactions = (
+        CashTransaction.objects
+        .filter(cash_register=cash_register)
+        .select_related('order', 'employee')
+        .order_by('-created_at')
+    )
+
     if operation_type:
-        transactions = transactions.filter(operation_type=operation_type)
+        transactions = transactions.filter(
+            operation_type=operation_type
+        )
 
-    payment_method = request.GET.get('payment_method', '')
     if payment_method:
-        transactions = transactions.filter(payment_method=payment_method)
+        transactions = transactions.filter(
+            payment_method=payment_method
+        )
 
-    date_from = request.GET.get('date_from', '')
-    if date_from:
-        transactions = transactions.filter(created_at__date__gte=date_from)
+    if date_from_str:
+        transactions = transactions.filter(
+            created_at__date__gte=date_from_str
+        )
 
-    date_to = request.GET.get('date_to', '')
-    if date_to:
-        transactions = transactions.filter(created_at__date__lte=date_to)
+    if date_to_str:
+        transactions = transactions.filter(
+            created_at__date__lte=date_to_str
+        )
 
-    # Пагинация
+
+    total_income = (
+        transactions
+        .filter(operation_type='income')
+        .aggregate(total=Sum('amount'))['total']
+        or 0
+    )
+
+    total_expense = (
+        transactions
+        .filter(operation_type='expense')
+        .aggregate(total=Sum('amount'))['total']
+        or 0
+    )
+
+    net_flow = total_income - total_expense
+    current_balance = cash_register.current_balance()
     paginator = Paginator(transactions, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
+    today = timezone.localdate()
 
-    # Статистика
-    total_income = transactions.filter(operation_type='income').aggregate(total=Sum('amount'))['total'] or 0
-    total_expense = transactions.filter(operation_type='expense').aggregate(total=Sum('amount'))['total'] or 0
-    current_balance = cash_register.current_balance() if cash_register else 0
+    if date_from_str:
+        try:
+            chart_start = date.fromisoformat(date_from_str)
+        except ValueError:
+            chart_start = today - timedelta(days=29)
+    else:
+        chart_start = today - timedelta(days=29)
+
+    if date_to_str:
+        try:
+            chart_end = date.fromisoformat(date_to_str)
+        except ValueError:
+            chart_end = today
+    else:
+        chart_end = today
+
+    if chart_start > chart_end:
+        chart_start, chart_end = chart_end, chart_start
+
+    month_start = today.replace(day=1)
+
+    quarter_month = ((today.month - 1) // 3) * 3 + 1
+    quarter_start = today.replace(
+        month=quarter_month,
+        day=1
+    )
+
+    period_filter = 'custom'
+
+    if chart_start == today and chart_end == today:
+        period_filter = 'today'
+
+    elif (
+        chart_start == today - timedelta(days=6)
+        and chart_end == today
+    ):
+        period_filter = '7days'
+
+    elif (
+        chart_start == month_start
+        and chart_end == today
+    ):
+        period_filter = 'month'
+
+    elif (
+        chart_start == quarter_start
+        and chart_end == today
+    ):
+        period_filter = 'quarter'
+
+    #  ДАННЫЕ ДЛЯ ГРАФИКА
+    # Берём операции от начала периода и до конца периода.
+    chart_transactions = (
+        CashTransaction.objects
+        .filter(
+            cash_register=cash_register,
+            created_at__date__lte=chart_end,
+        )
+        .order_by('created_at', 'id')
+    )
+
+    # Баланс ДО начала выбранного периода.
+    opening_income = (
+        chart_transactions
+        .filter(
+            operation_type='income',
+            created_at__date__lt=chart_start,
+        )
+        .aggregate(total=Sum('amount'))['total']
+        or 0
+    )
+
+    opening_expense = (
+        chart_transactions
+        .filter(
+            operation_type='expense',
+            created_at__date__lt=chart_start,
+        )
+        .aggregate(total=Sum('amount'))['total']
+        or 0
+    )
+
+    opening_balance = opening_income - opening_expense
+    daily_income = defaultdict(lambda: 0)
+    daily_expense = defaultdict(lambda: 0)
+
+    for transaction in chart_transactions:
+        transaction_date = timezone.localtime(
+            transaction.created_at
+        ).date()
+
+        if transaction_date < chart_start:
+            continue
+
+        if transaction_date > chart_end:
+            continue
+
+        amount = transaction.amount or 0
+
+        if transaction.operation_type == 'income':
+            daily_income[transaction_date] += amount
+
+        elif transaction.operation_type == 'expense':
+            daily_expense[transaction_date] += amount
+
+    # =========================================================
+    # 6. Формируем массивы для Chart.js
+    # =========================================================
+
+    labels = []
+    income_data = []
+    expense_data = []
+    balance_data = []
+
+    running_balance = opening_balance
+
+    current_day = chart_start
+
+    while current_day <= chart_end:
+
+        income = daily_income[current_day]
+        expense = daily_expense[current_day]
+
+        running_balance += income - expense
+
+        labels.append(
+            current_day.strftime('%d.%m')
+        )
+
+        income_data.append(
+            float(income)
+        )
+
+        expense_data.append(
+            float(expense)
+        )
+
+        balance_data.append(
+            float(running_balance)
+        )
+
+        current_day += timedelta(days=1)
+
+    # =========================================================
+    # 7. ПРИХОДЫ / РАСХОДЫ ПО СПОСОБУ ОПЛАТЫ
+    # =========================================================
+
+    payment_stats = (
+        CashTransaction.objects
+        .filter(
+            cash_register=cash_register,
+            created_at__date__gte=chart_start,
+            created_at__date__lte=chart_end,
+        )
+        .values('payment_method', 'operation_type')
+        .annotate(total=Sum('amount'))
+    )
+
+    payment_method_labels = {
+        'cash': 'Наличные',
+        'card': 'Карта',
+        'transfer': 'Перевод',
+    }
+
+    method_order = [
+        'cash',
+        'card',
+        'transfer',
+    ]
+
+    income_by_method = {
+        method: 0
+        for method in method_order
+    }
+
+    expense_by_method = {
+        method: 0
+        for method in method_order
+    }
+
+    for row in payment_stats:
+        method = row['payment_method']
+        operation = row['operation_type']
+        total = row['total'] or 0
+
+        if method not in payment_method_labels:
+            continue
+
+        if operation == 'income':
+            income_by_method[method] = float(total)
+
+        elif operation == 'expense':
+            expense_by_method[method] = float(total)
+
+    method_labels = [
+        payment_method_labels[method]
+        for method in method_order
+    ]
+
+    income_by_method_data = [
+        income_by_method[method]
+        for method in method_order
+    ]
+
+    expense_by_method_data = [
+        expense_by_method[method]
+        for method in method_order
+    ]
+
+    cash_flow_data = {
+        'labels': labels,
+        'income': income_data,
+        'expense': expense_data,
+        'balance': balance_data,
+        'method_labels': method_labels,
+        'income_by_method': income_by_method_data,
+        'expense_by_method': expense_by_method_data,
+    }
 
     context = {
         'transactions': page_obj,
@@ -1882,13 +2149,21 @@ def cash_register_list(request):
         'cash_register': cash_register,
         'total_income': total_income,
         'total_expense': total_expense,
+        'net_flow': net_flow,
         'current_balance': current_balance,
         'operation_type_filter': operation_type,
         'payment_method_filter': payment_method,
-        'date_from': date_from,
-        'date_to': date_to,
+        'date_from': date_from_str,
+        'date_to': date_to_str,
+        'period_filter': period_filter,
+        'cash_flow_data': cash_flow_data,
     }
-    return render(request, 'inventorymanager/cash_register_list.html', context)
+
+    return render(
+        request,
+        'inventorymanager/cash_register_modern.html',
+        context
+    )
 
 
 @login_required

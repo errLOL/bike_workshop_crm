@@ -213,9 +213,11 @@ class CategoryForm(forms.ModelForm):
 class CashTransactionForm(forms.ModelForm):
     class Meta:
         model = CashTransaction
-        fields = ['operation_type', 'amount', 'payment_method', 'reason', 'comment', 'order', 'cash_register']
+        fields = ['operation_type', 'category', 'amount', 'payment_method',
+                  'reason', 'comment', 'order', 'cash_register',]
         widgets = {
             'comment': forms.Textarea(attrs={'rows': 3}),
+            'category': forms.Select(attrs={'class': 'form-select'}),
             'order': forms.Select(attrs={'class': 'form-select'}),
             'cash_register': forms.Select(attrs={'class': 'form-select'}),
         }
@@ -233,6 +235,7 @@ class CashTransactionForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_tag = False
+        self.fields['category'].required = True
 
         # Ограничиваем выбор заказов только незакрытыми
         self.fields['order'].queryset = Order.objects.filter(status__in=['draft', 'in_progress', 'awaiting_parts'])

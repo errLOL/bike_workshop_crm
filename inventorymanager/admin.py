@@ -16,6 +16,7 @@ admin.site.register(CashRegister)
 admin.site.register(ActionLog)
 admin.site.register(CashTransaction)
 admin.site.register(OrderPayment)
+admin.site.register(CashCategory)
 
 
 

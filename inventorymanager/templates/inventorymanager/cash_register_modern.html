@@ -1,0 +1,884 @@
+{% extends 'inventorymanager/layout.html' %}
+{% load static %}
+
+{% block title %}Касса · {{ cash_register.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --cash-bg: #f5f7fb;
+        --cash-border: #e7eaf0;
+        --cash-muted: #6b7280;
+        --cash-text: #111827;
+        --cash-success: #16a34a;
+        --cash-danger: #dc2626;
+        --cash-primary: #4f46e5;
+    }
+
+    .cash-page {
+        background: var(--cash-bg);
+        min-height: 100vh;
+    }
+
+    .page-title {
+        color: var(--cash-text);
+        font-weight: 700;
+        letter-spacing: -.02em;
+    }
+
+    .cash-card {
+        background: #fff;
+        border: 1px solid var(--cash-border);
+        border-radius: 16px;
+        box-shadow: 0 4px 18px rgba(15, 23, 42, .04);
+    }
+
+    .balance-card {
+        color: #fff;
+        border: 0;
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        overflow: hidden;
+        position: relative;
+    }
+
+    .balance-card:after {
+        content: "";
+        position: absolute;
+        width: 180px;
+        height: 180px;
+        right: -70px;
+        top: -80px;
+        border-radius: 50%;
+        background: rgba(255,255,255,.08);
+    }
+
+    .balance-value {
+        font-size: clamp(2rem, 3vw, 2.7rem);
+        font-weight: 800;
+        letter-spacing: -.04em;
+    }
+
+    .metric-card {
+        min-height: 142px;
+        padding: 20px;
+    }
+
+    .metric-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 11px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #f3f4f6;
+    }
+
+    .metric-label {
+        color: var(--cash-muted);
+        font-size: .82rem;
+        font-weight: 600;
+    }
+
+    .metric-value {
+        color: var(--cash-text);
+        font-size: 1.55rem;
+        font-weight: 750;
+        letter-spacing: -.025em;
+    }
+
+    .text-income { color: var(--cash-success) !important; }
+    .text-expense { color: var(--cash-danger) !important; }
+
+    .period-switch .btn {
+        border-color: var(--cash-border);
+        background: #fff;
+        color: #4b5563;
+        font-size: .85rem;
+    }
+
+    .period-switch .btn.active,
+    .period-switch .btn:hover {
+        background: #111827;
+        border-color: #111827;
+        color: #fff;
+    }
+
+    .chart-wrap {
+        height: 300px;
+        position: relative;
+    }
+
+    .mini-chart-wrap {
+        height: 250px;
+        position: relative;
+    }
+
+    .section-title {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--cash-text);
+    }
+
+    .section-subtitle {
+        color: var(--cash-muted);
+        font-size: .82rem;
+    }
+
+    .filter-card {
+        padding: 16px;
+    }
+
+    .filter-card .form-label {
+        font-size: .75rem;
+        font-weight: 650;
+        color: #6b7280;
+        margin-bottom: 5px;
+    }
+
+    .form-control, .form-select {
+        border-color: var(--cash-border);
+        border-radius: 10px;
+    }
+
+    .form-control:focus, .form-select:focus {
+        border-color: #a5b4fc;
+        box-shadow: 0 0 0 .2rem rgba(99,102,241,.1);
+    }
+
+    .table-card {
+        overflow: hidden;
+    }
+
+    #cashTransactions {
+        margin-bottom: 0 !important;
+    }
+
+    #cashTransactions thead th {
+        background: #f8fafc;
+        color: #6b7280;
+        font-size: .72rem;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        border-bottom: 1px solid var(--cash-border);
+        white-space: nowrap;
+        padding: 13px 16px;
+    }
+
+    #cashTransactions tbody td {
+        padding: 14px 16px;
+        vertical-align: middle;
+        border-color: #f0f2f5;
+    }
+
+    .transaction-title {
+        color: #111827;
+        font-weight: 650;
+    }
+
+    .transaction-meta {
+        color: #9ca3af;
+        font-size: .75rem;
+    }
+
+    .type-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 7px;
+    }
+
+    .dot-income { background: #22c55e; }
+    .dot-expense { background: #ef4444; }
+
+    .amount {
+        font-weight: 750;
+        white-space: nowrap;
+    }
+
+    .balance-after {
+        color: #6b7280;
+        font-size: .82rem;
+        white-space: nowrap;
+    }
+
+    .action-btn {
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .drawer .modal-dialog {
+        margin: 0 0 0 auto;
+        max-width: 480px;
+        height: 100%;
+    }
+
+    .drawer .modal-content {
+        height: 100%;
+        border: 0;
+        border-radius: 18px 0 0 18px;
+    }
+
+    .detail-amount {
+        font-size: 2rem;
+        font-weight: 800;
+        letter-spacing: -.04em;
+    }
+
+    .detail-row {
+        padding: 12px 0;
+        border-bottom: 1px solid #f0f2f5;
+    }
+
+    .detail-label {
+        color: #9ca3af;
+        font-size: .78rem;
+    }
+
+    .detail-value {
+        color: #111827;
+        font-weight: 600;
+    }
+
+    .dataTables_wrapper .dataTables_filter input {
+        border: 1px solid var(--cash-border);
+        border-radius: 9px;
+        padding: 7px 10px;
+        margin-left: 8px;
+    }
+
+    .dataTables_wrapper .dataTables_length select {
+        border: 1px solid var(--cash-border);
+        border-radius: 8px;
+        padding: 5px 25px 5px 8px;
+    }
+
+    .dataTables_wrapper .dataTables_info,
+    .dataTables_wrapper .dataTables_paginate {
+        font-size: .8rem;
+        color: #6b7280;
+    }
+
+    @media (max-width: 767.98px) {
+        .cash-page .container-fluid { padding-left: 12px; padding-right: 12px; }
+        .chart-wrap { height: 250px; }
+        .mini-chart-wrap { height: 220px; }
+        .drawer .modal-dialog { max-width: 100%; }
+        .drawer .modal-content { border-radius: 0; }
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="cash-page">
+<div class="container-fluid py-4">
+
+    <!-- Header -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <a href="javascript:history.back()" class="btn btn-sm btn-light border action-btn">
+                    <i class="fas fa-arrow-left"></i>
+                </a>
+                <h2 class="page-title mb-0">Касса</h2>
+            </div>
+            <div class="text-muted small ms-5">{{ cash_register.name }}</div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button class="btn btn-light border" onclick="window.print()">
+                <i class="fas fa-print me-1"></i> Печать
+            </button>
+            <a href="{% url 'cash_transaction_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i> Новая операция
+            </a>
+        </div>
+    </div>
+
+    <!-- Period -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+        <div>
+            <div class="section-title">Финансовый обзор</div>
+            <div class="section-subtitle">Движение денег за выбранный период</div>
+        </div>
+        <div class="btn-group period-switch" role="group">
+            <button
+                type="button"
+                class="btn btn-sm {% if period_filter == 'today' %}active{% endif %}"
+                data-period="today">
+                Сегодня
+            </button>
+
+            <button
+                type="button"
+                class="btn btn-sm {% if period_filter == '7days' %}active{% endif %}"
+                data-period="7days">
+                7 дней
+            </button>
+
+            <button
+                type="button"
+                class="btn btn-sm {% if period_filter == 'month' %}active{% endif %}"
+                data-period="month">
+                Месяц
+            </button>
+
+            <button
+                type="button"
+                class="btn btn-sm {% if period_filter == 'quarter' %}active{% endif %}"
+                data-period="quarter">
+                Квартал
+            </button>
+        </div>
+    </div>
+
+    <!-- KPI -->
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-xl-3">
+            <div class="cash-card balance-card metric-card h-100">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="small opacity-75 mb-2">Текущий остаток</div>
+                        <div class="balance-value">{{ current_balance|floatformat:2 }} ₽</div>
+                    </div>
+                    <i class="fas fa-wallet opacity-75"></i>
+                </div>
+                <div class="small opacity-75 mt-3">
+                    <i class="fas fa-circle-check me-1"></i> Остаток по кассе
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-xl-3">
+            <div class="cash-card metric-card h-100">
+                <div class="d-flex justify-content-between">
+                    <div class="metric-label">Приход</div>
+                    <span class="metric-icon text-income"><i class="fas fa-arrow-down"></i></span>
+                </div>
+                <div class="metric-value text-income mt-3">+{{ total_income|floatformat:2 }} ₽</div>
+                <div class="small text-muted mt-1">за выбранный период</div>
+            </div>
+        </div>
+
+        <div class="col-6 col-xl-3">
+            <div class="cash-card metric-card h-100">
+                <div class="d-flex justify-content-between">
+                    <div class="metric-label">Расход</div>
+                    <span class="metric-icon text-expense"><i class="fas fa-arrow-up"></i></span>
+                </div>
+                <div class="metric-value text-expense mt-3">−{{ total_expense|floatformat:2 }} ₽</div>
+                <div class="small text-muted mt-1">за выбранный период</div>
+            </div>
+        </div>
+
+        <div class="col-12 col-xl-3">
+            <div class="cash-card metric-card h-100">
+                <div class="d-flex justify-content-between">
+                    <div class="metric-label">Чистый поток</div>
+                    <span class="metric-icon"><i class="fas fa-chart-line"></i></span>
+                </div>
+                <div class="metric-value mt-3">{{ net_flow|floatformat:2|default:"—" }} ₽</div>
+                <div class="small text-muted mt-1">приход − расход</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main chart -->
+    <div class="cash-card p-3 p-md-4 mb-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div>
+                <div class="section-title">Движение денежных средств</div>
+                <div class="section-subtitle">Приход, расход и изменение остатка</div>
+            </div>
+            <div class="small text-muted">
+                <i class="fas fa-calendar-alt me-1"></i>
+                {{ date_from|default:"Весь период" }}{% if date_to %} — {{ date_to }}{% endif %}
+            </div>
+        </div>
+        <div class="chart-wrap">
+            <canvas id="cashFlowChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Analytics -->
+    <div class="row g-3 mb-4">
+        <div class="col-lg-6">
+            <div class="cash-card p-3 p-md-4 h-100">
+                <div class="mb-3">
+                    <div class="section-title">Откуда пришли деньги</div>
+                    <div class="section-subtitle">Распределение приходов по способам оплаты</div>
+                </div>
+                <div class="mini-chart-wrap">
+                    <canvas id="incomePaymentChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="cash-card p-3 p-md-4 h-100">
+                <div class="mb-3">
+                    <div class="section-title">Куда ушли деньги</div>
+                    <div class="section-subtitle">Расходы по способам оплаты</div>
+                </div>
+                <div class="mini-chart-wrap">
+                    <canvas id="expensePaymentChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="cash-card filter-card mb-3">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-12 col-md-3">
+                <label class="form-label">Операция</label>
+                <select name="operation_type" class="form-select">
+                    <option value="">Все операции</option>
+                    <option value="income" {% if operation_type_filter == 'income' %}selected{% endif %}>Приход</option>
+                    <option value="expense" {% if operation_type_filter == 'expense' %}selected{% endif %}>Расход</option>
+                </select>
+            </div>
+            <div class="col-12 col-md-3">
+                <label class="form-label">Способ оплаты</label>
+                <select name="payment_method" class="form-select">
+                    <option value="">Все способы</option>
+                    <option value="cash" {% if payment_method_filter == 'cash' %}selected{% endif %}>Наличные</option>
+                    <option value="card" {% if payment_method_filter == 'card' %}selected{% endif %}>Карта</option>
+                    <option value="transfer" {% if payment_method_filter == 'transfer' %}selected{% endif %}>Перевод</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label">С даты</label>
+                <input type="date" name="date_from" class="form-control" value="{{ date_from }}">
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label">По дату</label>
+                <input type="date" name="date_to" class="form-control" value="{{ date_to }}">
+            </div>
+            <div class="col-12 col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-primary flex-grow-1">
+                    <i class="fas fa-filter me-1"></i> Фильтр
+                </button>
+                <a href="?" class="btn btn-light border" title="Сбросить">
+                    <i class="fas fa-rotate-left"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Transactions -->
+    <div class="cash-card table-card">
+        <div class="d-flex flex-wrap justify-content-between align-items-center p-3 p-md-4 pb-2">
+            <div>
+                <div class="section-title">Операции</div>
+                <div class="section-subtitle">История движения средств</div>
+            </div>
+            <div class="small text-muted">{{ transactions|length }} на странице</div>
+        </div>
+
+        <div class="table-responsive">
+            <table id="cashTransactions" class="table table-hover w-100">
+                <thead>
+                    <tr>
+                        <th>Дата</th>
+                        <th>Операция</th>
+                        <th>Сумма</th>
+                        <th>Способ</th>
+                        <th>Сотрудник</th>
+                        <th>Заказ</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for transaction in transactions %}
+                    <tr>
+                        <td data-order="{{ transaction.created_at|date:'Y-m-d H:i:s' }}">
+                            <div class="transaction-title">{{ transaction.created_at|date:"d.m.Y" }}</div>
+                            <div class="transaction-meta">{{ transaction.created_at|date:"H:i" }}</div>
+                        </td>
+                        <td>
+                            <div class="transaction-title text-truncate" style="max-width:260px;">
+                                <span class="type-dot {% if transaction.operation_type == 'income' %}dot-income{% else %}dot-expense{% endif %}"></span>
+                                {{ transaction.reason|truncatewords:8 }}
+                            </div>
+                            <div class="transaction-meta">
+                                {% if transaction.operation_type == 'income' %}Приход{% else %}Расход{% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="amount {% if transaction.operation_type == 'income' %}text-income{% else %}text-expense{% endif %}">
+                                {% if transaction.operation_type == 'income' %}+{% else %}−{% endif %}{{ transaction.amount|floatformat:2 }} ₽
+                            </div>
+                        </td>
+                        <td>{{ transaction.get_payment_method_display }}</td>
+                        <td>{{ transaction.employee.get_full_name|default:transaction.employee.username }}</td>
+                        <td>
+                            {% if transaction.order %}
+                                <a href="{% url 'order_detail' transaction.order.id %}" class="fw-semibold text-decoration-none">
+                                    #{{ transaction.order.id }}
+                                </a>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td class="text-end">
+                            <button type="button"
+                                    class="btn btn-light border action-btn"
+                                    onclick="showDetails({{ transaction.id }})"
+                                    title="Подробнее">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-5 text-muted">
+                            <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
+                            Нет кассовых операций
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if is_paginated %}
+    <nav aria-label="Page navigation" class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                    <i class="fas fa-angle-left"></i>
+                </a>
+            </li>
+            {% endif %}
+            <li class="page-item active">
+                <span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+            </li>
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                    <i class="fas fa-angle-right"></i>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+</div>
+
+<!-- Transaction drawer -->
+<div class="modal fade drawer" id="transactionModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header border-0 p-4">
+                <div>
+                    <div class="text-muted small">Детали операции</div>
+                    <h5 class="modal-title mt-1">Кассовая операция</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body px-4" id="transactionDetails">
+                <div class="text-center py-5 text-muted">
+                    <div class="spinner-border spinner-border-sm"></div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 p-4">
+                <button type="button" class="btn btn-light border w-100" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+{{ cash_flow_data|json_script:"cash-flow-data" }}
+{% endblock %}
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const dataElement = document.getElementById('cash-flow-data');
+    if (!dataElement) {
+        console.error('cash-flow-data не найден');
+        return;
+    }
+
+    const cashFlowData = JSON.parse(dataElement.textContent);
+    if (typeof Chart === 'undefined') {
+        console.error(
+            'Chart.js не загружен. Проверь подключение Chart.js в layout.html'
+        );
+        return;
+    }
+
+    const flowCanvas = document.getElementById('cashFlowChart');
+    if (flowCanvas) {
+        new Chart(flowCanvas, {
+            type: 'line',
+            data: {
+                labels: cashFlowData.labels,
+                datasets: [
+                    {
+                        label: 'Приход',
+                        data: cashFlowData.income,
+                        borderColor: '#22c55e',
+                        backgroundColor: 'rgba(34, 197, 94, 0.12)',
+                        borderWidth: 2,
+                        tension: 0.35,
+                        fill: true
+                    },
+
+                    {
+                        label: 'Расход',
+                        data: cashFlowData.expense,
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.10)',
+                        borderWidth: 2,
+                        tension: 0.35,
+                        fill: true
+                    },
+
+                    {
+                        label: 'Баланс',
+                        data: cashFlowData.balance,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                        borderWidth: 3,
+                        tension: 0.35,
+                        fill: false
+                    }
+                ]
+            },
+
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+
+                plugins: {
+                    legend: {
+                        display: true
+                    },
+
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+
+                                const value =
+                                    Number(context.raw || 0)
+                                    .toLocaleString('ru-RU', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2
+                                    });
+
+                                return `${context.dataset.label}: ${value} ₽`;
+                            }
+                        }
+                    }
+                },
+
+                scales: {
+                    y: {
+                        beginAtZero: false,
+
+                        ticks: {
+                            callback: function (value) {
+                                return Number(value)
+                                    .toLocaleString('ru-RU') + ' ₽';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Приходы по способу оплаты
+    const incomeCanvas = document.getElementById('incomePaymentChart');
+    if (incomeCanvas) {
+        new Chart(incomeCanvas, {
+            type: 'doughnut',
+            data: {
+                labels: cashFlowData.method_labels,
+                datasets: [{
+                    data: cashFlowData.income_by_method,
+                    backgroundColor: [
+                        '#22c55e',
+                        '#3b82f6',
+                        '#8b5cf6',
+                        '#f59e0b'
+                    ],
+                    borderWidth: 0
+                }]
+            },
+
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+
+    // Расходы по способу оплаты
+
+    const expenseCanvas = document.getElementById('expensePaymentChart');
+
+    if (expenseCanvas) {
+        new Chart(expenseCanvas, {
+            type: 'doughnut',
+            data: {
+                labels: cashFlowData.method_labels,
+                datasets: [{
+                    data: cashFlowData.expense_by_method,
+                    backgroundColor: [
+                        '#ef4444',
+                        '#f97316',
+                        '#8b5cf6',
+                        '#64748b'
+                    ],
+                    borderWidth: 0
+                }]
+            },
+
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+
+
+    // ПЕРИОДЫ
+
+    const periodButtons = document.querySelectorAll('[data-period]');
+
+    periodButtons.forEach(function (button) {
+        button.addEventListener('click', function () {
+            const period = button.dataset.period;
+            const now = new Date();
+            let from = new Date(now);
+            let to = new Date(now);
+
+            if (period === 'today') {
+                from = new Date(now);
+                to = new Date(now);
+            }
+            else if (period === '7days') {
+                from.setDate(
+                    now.getDate() - 6
+                );
+            }
+            else if (period === 'month') {
+                from = new Date(
+                    now.getFullYear(),
+                    now.getMonth(),
+                    1
+                );
+            }
+            else if (period === 'quarter') {
+                const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
+                from = new Date(now.getFullYear(), quarterStartMonth, 1);
+            }
+
+            function formatDate(date) {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            }
+
+            const params = new URLSearchParams(window.location.search);
+            params.set('date_from', formatDate(from));
+            params.set('date_to',formatDate(to));
+
+            // Возвращаемся на первую страницу
+            params.delete('page');
+            window.location.href = window.location.pathname + '?' + params.toString();
+        });
+    });
+
+});
+function showDetails(transactionId) {
+    const body = document.getElementById('transactionDetails');
+    body.innerHTML = `
+        <div class="text-center py-5 text-muted">
+            <div class="spinner-border"></div>
+        </div>`;
+
+    fetch(`/cash-transaction/detail/${transactionId}`)
+        .then(response => {
+            if (!response.ok) throw new Error('Не удалось загрузить операцию');
+            return response.json();
+        })
+        .then(data => {
+            const income = data.operation_type === 'income';
+            body.innerHTML = `
+                <div class="text-center py-3 mb-2">
+                    <div class="detail-amount ${income ? 'text-income' : 'text-expense'}">
+                        ${income ? '+' : '−'}${data.amount} ₽
+                    </div>
+                    <div class="text-muted mt-1">${data.operation_type_display}</div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">Дата и время</div>
+                    <div class="detail-value">${data.created_at}</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Способ оплаты</div>
+                    <div class="detail-value">${data.payment_method_display}</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Основание</div>
+                    <div class="detail-value">${escapeHtml(data.reason || '—')}</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Комментарий</div>
+                    <div class="detail-value">${escapeHtml(data.comment || '—')}</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Сотрудник</div>
+                    <div class="detail-value">${escapeHtml(data.employee || '—')}</div>
+                </div>
+                ${data.order ? `
+                <div class="detail-row">
+                    <div class="detail-label">Заказ</div>
+                    <div class="detail-value">
+                        <a href="/orders/${data.order}/">#${data.order}</a>
+                    </div>
+                </div>` : ''}
+                <div class="detail-row">
+                    <div class="detail-label">Касса</div>
+                    <div class="detail-value">${escapeHtml(data.cash_register || '—')}</div>
+                </div>`;
+            new bootstrap.Modal(document.getElementById('transactionModal')).show();
+        })
+        .catch(error => {
+            body.innerHTML = `<div class="alert alert-danger">Не удалось загрузить данные операции.</div>`;
+            new bootstrap.Modal(document.getElementById('transactionModal')).show();
+            console.error(error);
+        });
+}
+
+function escapeHtml(value) {
+    const div = document.createElement('div');
+    div.textContent = value;
+    return div.innerHTML;
+}
+
+</script>
+{% endblock %}

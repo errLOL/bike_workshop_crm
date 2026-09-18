@@ -340,6 +340,43 @@ class CashRegister(models.Model):
         verbose_name_plural = 'Кассы'
 
 
+class CashCategory(models.Model):
+    CATEGORY_TYPES = [
+        ('income', 'Приход'),
+        ('expense', 'Расход'),
+    ]
+
+    name = models.CharField(
+        max_length=100,
+        unique=True,
+        verbose_name='Название'
+    )
+
+    category_type = models.CharField(
+        max_length=10,
+        choices=CATEGORY_TYPES,
+        verbose_name='Тип'
+    )
+
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name='Активна'
+    )
+
+    sort_order = models.PositiveIntegerField(
+        default=0,
+        verbose_name='Порядок'
+    )
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        ordering = ['category_type', 'sort_order', 'name']
+        verbose_name = 'Категория кассы'
+        verbose_name_plural = 'Категории кассы'
+
+
 class CashTransaction(models.Model):
     OPERATION_TYPES = [
         ('income', 'Приход'),
@@ -351,7 +388,8 @@ class CashTransaction(models.Model):
         ('card', 'Карта'),
         ('transfer', 'Перевод'),
     ]
-    cash_register = models.ForeignKey(CashRegister, on_delete=models.CASCADE, related_name='transactions', verbose_name='Касса')
+    cash_register = models.ForeignKey(CashRegister, on_delete=models.PROTECT, related_name='transactions', verbose_name='Касса')
+    category = models.ForeignKey(CashCategory,on_delete=models.PROTECT, null=True, blank=True, related_name='transactions', verbose_name='Категория')
     order_payment = models.OneToOneField('OrderPayment', on_delete=models.CASCADE, null=True, blank=True, related_name='cash_transaction', verbose_name='Оплата заказа')
     order = models.ForeignKey('Order', on_delete=models.SET_NULL, null=True, blank=True, verbose_name='Заказ (для расходов)')
     employee = models.ForeignKey(get_user_model(), on_delete=models.SET_NULL, null=True, related_name='cash_transactions', verbose_name='Сотрудник')

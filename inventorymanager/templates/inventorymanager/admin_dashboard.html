@@ -68,7 +68,6 @@
 
 {% block body %}
 <div class="container-fluid py-4">
-    <!-- Заголовок -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h1 class="mb-0">
@@ -80,7 +79,44 @@
             <i class="fas fa-calendar-alt me-1"></i>{% now "d.m.Y" %}
         </div>
     </div>
-
+    <div class="row g-3 mt-2 mb-4">
+        <div class="col-md-3 col-sm-6">
+            <a href="{% url 'orders' %}" class="text-decoration-none">
+                <div class="card shadow-sm text-center py-3">
+                    <i class="fas fa-clipboard-list fa-2x text-primary mb-2"></i>
+                    <div class="fw-bold">Заказы</div>
+                    <small class="text-muted">Управление заказами</small>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <a href="{% url 'products' %}" class="text-decoration-none">
+                <div class="card shadow-sm text-center py-3">
+                    <i class="fas fa-boxes fa-2x text-success mb-2"></i>
+                    <div class="fw-bold">Товары</div>
+                    <small class="text-muted">Управление складом</small>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <a href="{% url 'customers' %}" class="text-decoration-none">
+                <div class="card shadow-sm text-center py-3">
+                    <i class="fas fa-users fa-2x text-info mb-2"></i>
+                    <div class="fw-bold">Клиенты</div>
+                    <small class="text-muted">База клиентов</small>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <a href="{% url 'salary_report' %}" class="text-decoration-none">
+                <div class="card shadow-sm text-center py-3">
+                    <i class="fas fa-ruble-sign fa-2x text-warning mb-2"></i>
+                    <div class="fw-bold">Зарплаты</div>
+                    <small class="text-muted">Отчёт по зарплатам</small>
+                </div>
+            </a>
+        </div>
+    </div>
     <!-- Карточки статистики -->
     <div class="row g-4 mb-4">
         <!-- Выручка -->
@@ -298,46 +334,6 @@
                 </div>
                 {% endif %}
             </div>
-        </div>
-    </div>
-
-    <!-- Быстрый доступ -->
-    <div class="row g-3 mt-2">
-        <div class="col-md-3 col-sm-6">
-            <a href="{% url 'orders' %}" class="text-decoration-none">
-                <div class="card shadow-sm text-center py-3">
-                    <i class="fas fa-clipboard-list fa-2x text-primary mb-2"></i>
-                    <div class="fw-bold">Заказы</div>
-                    <small class="text-muted">Управление заказами</small>
-                </div>
-            </a>
-        </div>
-        <div class="col-md-3 col-sm-6">
-            <a href="{% url 'products' %}" class="text-decoration-none">
-                <div class="card shadow-sm text-center py-3">
-                    <i class="fas fa-boxes fa-2x text-success mb-2"></i>
-                    <div class="fw-bold">Товары</div>
-                    <small class="text-muted">Управление складом</small>
-                </div>
-            </a>
-        </div>
-        <div class="col-md-3 col-sm-6">
-            <a href="{% url 'customers' %}" class="text-decoration-none">
-                <div class="card shadow-sm text-center py-3">
-                    <i class="fas fa-users fa-2x text-info mb-2"></i>
-                    <div class="fw-bold">Клиенты</div>
-                    <small class="text-muted">База клиентов</small>
-                </div>
-            </a>
-        </div>
-        <div class="col-md-3 col-sm-6">
-            <a href="{% url 'salary_report' %}" class="text-decoration-none">
-                <div class="card shadow-sm text-center py-3">
-                    <i class="fas fa-ruble-sign fa-2x text-warning mb-2"></i>
-                    <div class="fw-bold">Зарплаты</div>
-                    <small class="text-muted">Отчёт по зарплатам</small>
-                </div>
-            </a>
         </div>
     </div>
 </div>
