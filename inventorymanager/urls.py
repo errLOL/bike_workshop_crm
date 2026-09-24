@@ -19,6 +19,7 @@ urlpatterns = [
     path("casher", views.cash_register_list, name="cash_register_list"),
     path("create_customer", views.create_customer, name="create_customer"),
     path("cash_transaction_create", views.cash_transaction_create, name="cash_transaction_create"),
+
     path("create_supplier", views.create_supplier, name="create_supplier"),
     path("create_transport", views.create_transport, name="create_transport"),
     path("create_product", views.create_product, name="create_product"),
@@ -47,6 +48,7 @@ urlpatterns = [
     path('edit_product/<int:product_id>', views.edit_product, name='edit_product'),
     path('edit_category/<int:id>', views.edit_category, name='edit_category'),
     path('edit_transport/<int:transport_id>', views.edit_transport, name='edit_transport'),
+    path('cash/transaction/<int:pk>/edit/', views.cash_transaction_edit, name='cash_transaction_edit'),
     # Cancel url
     path('cancel_order_update/<int:order_id>', views.cancel_order_update, name='cancel_order_update'),
     path('change_order_status/<int:order_id>', views.change_order_status, name='change_order_status'),

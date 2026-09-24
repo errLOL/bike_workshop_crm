@@ -1838,26 +1838,48 @@ def delete_category(request, id):
 @require_admin
 def cash_register_list(request):
     cash_register = CashRegister.objects.filter(is_active=True).first()
+
+    # =========================================================
+    # 1. Если активной кассы нет
+    # =========================================================
+
     if not cash_register:
         context = {
             'transactions': [],
             'page_obj': None,
             'is_paginated': False,
             'cash_register': None,
+
             'total_income': 0,
             'total_expense': 0,
             'current_balance': 0,
             'net_flow': 0,
+
             'operation_type_filter': '',
             'payment_method_filter': '',
+            'category_filter': '',
+            'employee_filter': '',
             'date_from': '',
             'date_to': '',
+
             'period_filter': 'month',
+
+            'categories': [],
+            'employees': [],
+
             'cash_flow_data': {
                 'labels': [],
                 'income': [],
                 'expense': [],
                 'balance': [],
+
+                # Категории
+                'income_category_labels': [],
+                'income_by_category': [],
+                'expense_category_labels': [],
+                'expense_by_category': [],
+
+                # Способы оплаты
                 'income_by_method': [],
                 'expense_by_method': [],
                 'method_labels': [],
@@ -1869,28 +1891,81 @@ def cash_register_list(request):
             'inventorymanager/cash_register_modern.html',
             context
         )
-    operation_type = request.GET.get('operation_type', '').strip()
-    payment_method = request.GET.get('payment_method', '').strip()
-    date_from_str = request.GET.get('date_from', '').strip()
-    date_to_str = request.GET.get('date_to', '').strip()
+
+    # =========================================================
+    # 2. GET-параметры фильтров
+    # =========================================================
+
+    operation_type = request.GET.get(
+        'operation_type',
+        ''
+    ).strip()
+
+    payment_method = request.GET.get(
+        'payment_method',
+        ''
+    ).strip()
+
+    category_filter = request.GET.get(
+        'category',
+        ''
+    ).strip()
+
+    employee_filter = request.GET.get(
+        'employee',
+        ''
+    ).strip()
+
+    date_from_str = request.GET.get(
+        'date_from',
+        ''
+    ).strip()
+
+    date_to_str = request.GET.get(
+        'date_to',
+        ''
+    ).strip()
+
+    # =========================================================
+    # 3. Основной QuerySet операций
+    # =========================================================
 
     transactions = (
         CashTransaction.objects
         .filter(cash_register=cash_register)
-        .select_related('order', 'employee')
+        .select_related(
+            'order',
+            'employee',
+            'category',
+        )
         .order_by('-created_at')
     )
 
+    # Фильтр по типу операции
     if operation_type:
         transactions = transactions.filter(
             operation_type=operation_type
         )
 
+    # Фильтр по способу оплаты
     if payment_method:
         transactions = transactions.filter(
             payment_method=payment_method
         )
 
+    # Фильтр по категории
+    if category_filter:
+        transactions = transactions.filter(
+            category_id=category_filter
+        )
+
+    # Фильтр по сотруднику
+    if employee_filter:
+        transactions = transactions.filter(
+            employee_id=employee_filter
+        )
+
+    # Фильтр по дате
     if date_from_str:
         transactions = transactions.filter(
             created_at__date__gte=date_from_str
@@ -1901,6 +1976,9 @@ def cash_register_list(request):
             created_at__date__lte=date_to_str
         )
 
+    # =========================================================
+    # 4. KPI
+    # =========================================================
 
     total_income = (
         transactions
@@ -1917,15 +1995,30 @@ def cash_register_list(request):
     )
 
     net_flow = total_income - total_expense
+
     current_balance = cash_register.current_balance()
+
+    # =========================================================
+    # 5. Пагинация
+    # =========================================================
+
     paginator = Paginator(transactions, 20)
+
     page_number = request.GET.get('page')
+
     page_obj = paginator.get_page(page_number)
+
+    # =========================================================
+    # 6. Определяем период графика
+    # =========================================================
+
     today = timezone.localdate()
 
     if date_from_str:
         try:
-            chart_start = date.fromisoformat(date_from_str)
+            chart_start = date.fromisoformat(
+                date_from_str
+            )
         except ValueError:
             chart_start = today - timedelta(days=29)
     else:
@@ -1933,26 +2026,41 @@ def cash_register_list(request):
 
     if date_to_str:
         try:
-            chart_end = date.fromisoformat(date_to_str)
+            chart_end = date.fromisoformat(
+                date_to_str
+            )
         except ValueError:
             chart_end = today
     else:
         chart_end = today
 
     if chart_start > chart_end:
-        chart_start, chart_end = chart_end, chart_start
+        chart_start, chart_end = (
+            chart_end,
+            chart_start,
+        )
+
+    # =========================================================
+    # 7. Определяем активный preset периода
+    # =========================================================
 
     month_start = today.replace(day=1)
 
-    quarter_month = ((today.month - 1) // 3) * 3 + 1
+    quarter_month = (
+        ((today.month - 1) // 3) * 3
+    ) + 1
+
     quarter_start = today.replace(
         month=quarter_month,
-        day=1
+        day=1,
     )
 
     period_filter = 'custom'
 
-    if chart_start == today and chart_end == today:
+    if (
+        chart_start == today
+        and chart_end == today
+    ):
         period_filter = 'today'
 
     elif (
@@ -1973,18 +2081,24 @@ def cash_register_list(request):
     ):
         period_filter = 'quarter'
 
-    #  ДАННЫЕ ДЛЯ ГРАФИКА
-    # Берём операции от начала периода и до конца периода.
+    # =========================================================
+    # 8. Данные для основного графика
+    # =========================================================
+
     chart_transactions = (
         CashTransaction.objects
         .filter(
             cash_register=cash_register,
             created_at__date__lte=chart_end,
         )
+        .select_related('category')
         .order_by('created_at', 'id')
     )
 
-    # Баланс ДО начала выбранного периода.
+    # ---------------------------------------------------------
+    # Баланс ДО начала выбранного периода
+    # ---------------------------------------------------------
+
     opening_income = (
         chart_transactions
         .filter(
@@ -2005,7 +2119,14 @@ def cash_register_list(request):
         or 0
     )
 
-    opening_balance = opening_income - opening_expense
+    opening_balance = (
+        opening_income - opening_expense
+    )
+
+    # ---------------------------------------------------------
+    # Собираем дневные суммы
+    # ---------------------------------------------------------
+
     daily_income = defaultdict(lambda: 0)
     daily_expense = defaultdict(lambda: 0)
 
@@ -2029,7 +2150,7 @@ def cash_register_list(request):
             daily_expense[transaction_date] += amount
 
     # =========================================================
-    # 6. Формируем массивы для Chart.js
+    # 9. Массивы для Chart.js
     # =========================================================
 
     labels = []
@@ -2046,7 +2167,9 @@ def cash_register_list(request):
         income = daily_income[current_day]
         expense = daily_expense[current_day]
 
-        running_balance += income - expense
+        running_balance += (
+            income - expense
+        )
 
         labels.append(
             current_day.strftime('%d.%m')
@@ -2067,7 +2190,96 @@ def cash_register_list(request):
         current_day += timedelta(days=1)
 
     # =========================================================
-    # 7. ПРИХОДЫ / РАСХОДЫ ПО СПОСОБУ ОПЛАТЫ
+    # 10. КАТЕГОРИИ
+    #
+    # ВАЖНО:
+    # здесь берём операции только за выбранный период.
+    # Фильтры operation_type/payment_method/category/employee
+    # на аналитику категорий НЕ накладываем.
+    #
+    # Иначе, например, выбор категории в фильтре превратит
+    # график "Расходы по категориям" фактически в одну категорию.
+    # =========================================================
+
+    category_transactions = (
+        CashTransaction.objects
+        .filter(
+            cash_register=cash_register,
+            created_at__date__gte=chart_start,
+            created_at__date__lte=chart_end,
+        )
+        .values(
+            'category_id',
+            'category__name',
+            'operation_type',
+        )
+        .annotate(
+            total=Sum('amount')
+        )
+    )
+
+    income_categories = {}
+    expense_categories = {}
+
+    for row in category_transactions:
+        category_id = row['category_id']
+        category_name = row['category__name']
+
+        if not category_name:
+            category_name = 'Без категории'
+
+        total = row['total'] or 0
+
+        if row['operation_type'] == 'income':
+            income_categories[category_id] = {
+                'name': category_name,
+                'total': float(total),
+            }
+
+        elif row['operation_type'] == 'expense':
+            expense_categories[category_id] = {
+                'name': category_name,
+                'total': float(total),
+            }
+
+    # ---------------------------------------------------------
+    # Сортируем категории от большей суммы к меньшей
+    # ---------------------------------------------------------
+
+    income_categories_list = sorted(
+        income_categories.values(),
+        key=lambda item: item['total'],
+        reverse=True,
+    )
+
+    expense_categories_list = sorted(
+        expense_categories.values(),
+        key=lambda item: item['total'],
+        reverse=True,
+    )
+
+    income_category_labels = [
+        item['name']
+        for item in income_categories_list
+    ]
+
+    income_by_category = [
+        item['total']
+        for item in income_categories_list
+    ]
+
+    expense_category_labels = [
+        item['name']
+        for item in expense_categories_list
+    ]
+
+    expense_by_category = [
+        item['total']
+        for item in expense_categories_list
+    ]
+
+    # =========================================================
+    # 11. ПРИХОДЫ / РАСХОДЫ ПО СПОСОБУ ОПЛАТЫ
     # =========================================================
 
     payment_stats = (
@@ -2077,8 +2289,13 @@ def cash_register_list(request):
             created_at__date__gte=chart_start,
             created_at__date__lte=chart_end,
         )
-        .values('payment_method', 'operation_type')
-        .annotate(total=Sum('amount'))
+        .values(
+            'payment_method',
+            'operation_type',
+        )
+        .annotate(
+            total=Sum('amount')
+        )
     )
 
     payment_method_labels = {
@@ -2104,6 +2321,7 @@ def cash_register_list(request):
     }
 
     for row in payment_stats:
+
         method = row['payment_method']
         operation = row['operation_type']
         total = row['total'] or 0
@@ -2132,30 +2350,96 @@ def cash_register_list(request):
         for method in method_order
     ]
 
+    # =========================================================
+    # 12. Общий объект данных для Chart.js
+    # =========================================================
+
     cash_flow_data = {
+        # Основной график
         'labels': labels,
         'income': income_data,
         'expense': expense_data,
         'balance': balance_data,
+
+        # Категории
+        'income_category_labels': income_category_labels,
+        'income_by_category': income_by_category,
+
+        'expense_category_labels': expense_category_labels,
+        'expense_by_category': expense_by_category,
+
+        # Способы оплаты
         'method_labels': method_labels,
         'income_by_method': income_by_method_data,
         'expense_by_method': expense_by_method_data,
     }
 
+    # =========================================================
+    # 13. Категории для фильтра
+    # =========================================================
+
+    categories = (
+        CashCategory.objects
+        .filter(is_active=True)
+        .order_by(
+            'category_type',
+            'sort_order',
+            'name',
+        )
+    )
+
+    # =========================================================
+    # 14. Сотрудники для фильтра
+    # =========================================================
+
+    User = get_user_model()
+
+    employees = (
+        User.objects
+        .filter(
+            cash_transactions__cash_register=cash_register
+        )
+        .distinct()
+        .order_by(
+            'last_name',
+            'first_name',
+            'username',
+        )
+    )
+
+    # =========================================================
+    # 15. Context
+    # =========================================================
+
     context = {
         'transactions': page_obj,
         'page_obj': page_obj,
         'is_paginated': page_obj.has_other_pages(),
+
         'cash_register': cash_register,
+
+        # KPI
         'total_income': total_income,
         'total_expense': total_expense,
         'net_flow': net_flow,
         'current_balance': current_balance,
+
+        # Фильтры
         'operation_type_filter': operation_type,
         'payment_method_filter': payment_method,
+        'category_filter': category_filter,
+        'employee_filter': employee_filter,
         'date_from': date_from_str,
         'date_to': date_to_str,
+
+        # Period
         'period_filter': period_filter,
+
+        # Select options
+        'categories': categories,
+        'employees': employees,
+
+        # Charts
         'cash_flow_data': cash_flow_data,
     }
 
@@ -2166,29 +2450,213 @@ def cash_register_list(request):
     )
 
 
-@login_required
+# @login_required
+# def cash_transaction_create(request):
+#     if request.method == 'POST':
+#         form = CashTransactionForm(request.POST)
+#         if form.is_valid():
+#             transaction = form.save(commit=False)
+#             transaction.employee = request.user
+#             transaction.save()
+#
+#             # Логируем действие
+#             log_action(request, 'create', 'CashTransaction', transaction.id,
+#                       f"Кассовая операция #{transaction.id}: {transaction.get_operation_type_display()} {transaction.amount}₽")
+#
+#             messages.success(request, f'Операция "{transaction.reason}" создана')
+#             return redirect('cash_register_list')
+#     else:
+#         initial = {}
+#         cash_register = CashRegister.objects.filter(is_active=True).first()
+#         if cash_register:
+#             initial['cash_register'] = cash_register.id
+#         form = CashTransactionForm(initial=initial)
+#
+#     return render(request, 'inventorymanager/createCashTransaction.html', {'form': form, 'title': 'Новая операция'})
+
+@require_http_methods(["GET", "POST"])
 def cash_transaction_create(request):
-    if request.method == 'POST':
-        form = CashTransactionForm(request.POST)
-        if form.is_valid():
-            transaction = form.save(commit=False)
-            transaction.employee = request.user
-            transaction.save()
+    """
+    Создание кассовой операции через AJAX.
+    """
 
-            # Логируем действие
-            log_action(request, 'create', 'CashTransaction', transaction.id,
-                      f"Кассовая операция #{transaction.id}: {transaction.get_operation_type_display()} {transaction.amount}₽")
+    cash_register = CashRegister.objects.filter(
+        is_active=True
+    ).first()
 
-            messages.success(request, f'Операция "{transaction.reason}" создана')
-            return redirect('cash_register_list')
-    else:
-        initial = {}
-        cash_register = CashRegister.objects.filter(is_active=True).first()
-        if cash_register:
-            initial['cash_register'] = cash_register.id
-        form = CashTransactionForm(initial=initial)
+    if not cash_register:
+        return JsonResponse(
+            {
+                'success': False,
+                'message': 'Нет активной кассы.'
+            },
+            status=400
+        )
 
-    return render(request, 'inventorymanager/createCashTransaction.html', {'form': form, 'title': 'Новая операция'})
+    if request.method == 'GET':
+        form = CashTransactionForm(
+            initial={
+                'cash_register': cash_register.id,
+                'operation_type': 'income',
+            }
+        )
+
+        return JsonResponse({
+            'success': True,
+            'operation_type': 'income',
+            'category_id': None,
+            'amount': '',
+            'payment_method': 'cash',
+            'reason': '',
+            'comment': '',
+            'order_id': None,
+        })
+
+    form = CashTransactionForm(request.POST)
+
+    # Кассу устанавливаем сервером
+    form.data = form.data.copy()
+    form.data['cash_register'] = str(cash_register.id)
+
+    if form.is_valid():
+
+        transaction = form.save(commit=False)
+
+        # Кто создал операцию
+        transaction.employee = request.user
+
+        # Кассу также принудительно задаём сервером
+        transaction.cash_register = cash_register
+
+        transaction.save()
+
+        log_action(
+            request,
+            'create',
+            'CashTransaction',
+            transaction.id,
+            (
+                f"Кассовая операция #{transaction.id}: "
+                f"{transaction.get_operation_type_display()} "
+                f"{transaction.amount}₽"
+            )
+        )
+
+        return JsonResponse({
+            'success': True,
+            'message': f'Операция "{transaction.reason}" создана.',
+            'transaction_id': transaction.id,
+        })
+
+    return JsonResponse(
+        {
+            'success': False,
+            'errors': form.errors.get_json_data(),
+        },
+        status=400
+    )
+
+
+@require_http_methods(["GET", "POST"])
+def cash_transaction_edit(request, pk):
+    """
+    Редактирование кассовой операции через AJAX.
+    """
+
+    cash_register = CashRegister.objects.filter(
+        is_active=True
+    ).first()
+
+    if not cash_register:
+        return JsonResponse(
+            {
+                'success': False,
+                'message': 'Нет активной кассы.'
+            },
+            status=400
+        )
+
+    transaction = get_object_or_404(
+        CashTransaction,
+        pk=pk,
+        cash_register=cash_register
+    )
+
+    if request.method == 'GET':
+
+        return JsonResponse({
+            'success': True,
+
+            'id': transaction.id,
+
+            'operation_type': transaction.operation_type,
+
+            'category_id': (
+                transaction.category_id
+                if transaction.category_id
+                else None
+            ),
+
+            'amount': str(transaction.amount),
+
+            'payment_method': transaction.payment_method,
+
+            'reason': transaction.reason or '',
+
+            'comment': transaction.comment or '',
+
+            'order_id': (
+                transaction.order_id
+                if transaction.order_id
+                else None
+            ),
+        })
+
+    form = CashTransactionForm(
+        request.POST,
+        instance=transaction
+    )
+
+    # Кассу нельзя поменять через форму
+    form.data = form.data.copy()
+    form.data['cash_register'] = str(cash_register.id)
+
+    if form.is_valid():
+
+        transaction = form.save(commit=False)
+
+        transaction.cash_register = cash_register
+
+        # employee НЕ меняем.
+        # Это пользователь, который создал операцию.
+
+        transaction.save()
+
+        log_action(
+            request,
+            'update',
+            'CashTransaction',
+            transaction.id,
+            (
+                f"Изменена кассовая операция #{transaction.id}: "
+                f"{transaction.get_operation_type_display()} "
+                f"{transaction.amount}₽"
+            )
+        )
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Кассовая операция изменена.',
+            'transaction_id': transaction.id,
+        })
+
+    return JsonResponse(
+        {
+            'success': False,
+            'errors': form.errors.get_json_data(),
+        },
+        status=400
+    )
 
 @login_required
 @require_admin
@@ -2361,7 +2829,9 @@ def order_add_payment(request, order_id):
         if not payment_method:
             return JsonResponse({'success': False, 'error': 'Выберите способ оплаты'})
 
-        payment = order.add_payment(amount, payment_method, request.user, comment)
+        cash_category = CashCategory.objects.filter(sort_order=0, category_type="income").first()
+        print(cash_category)
+        payment = order.add_payment(cash_category, amount, payment_method, request.user, comment)
         log_action(
             request,
             'create',
@@ -2386,7 +2856,9 @@ def cash_transaction_detail(request, transaction_id):
     return JsonResponse({
         'id': transaction.id,
         'created_at': transaction.created_at.strftime('%d.%m.%Y %H:%M'),
+        'operation_type': transaction.operation_type,
         'operation_type_display': transaction.get_operation_type_display(),
+        'category': transaction.category.name,
         'amount': f"{transaction.amount:,.2f}".replace(',', ' '),
         'payment_method_display': transaction.get_payment_method_display(),
         'reason': transaction.reason,

@@ -211,35 +211,118 @@ class CategoryForm(forms.ModelForm):
 
 
 class CashTransactionForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['category'].required = True
+
+
+        self.fields['category'].queryset = CashCategory.objects.filter(
+            is_active=True
+        ).order_by(
+            'category_type',
+            'sort_order',
+            'name'
+        )
+
+        self.fields['order'].queryset = Order.objects.filter(
+            status__in=[
+                'draft',
+                'in_progress',
+                'awaiting_parts',
+                'ready',
+            ]).order_by('-id')
+
+    def clean(self):
+        cleaned_data = super().clean()
+        operation_type = cleaned_data.get('operation_type')
+        category = cleaned_data.get('category')
+        if operation_type and category:
+            if category.category_type != operation_type:
+                self.add_error(
+                    'category',
+                    'Категория не соответствует типу операции.'
+                )
+
+        return cleaned_data
+
     class Meta:
         model = CashTransaction
-        fields = ['operation_type', 'category', 'amount', 'payment_method',
-                  'reason', 'comment', 'order', 'cash_register',]
+        fields = [
+            'operation_type',
+            'category',
+            'amount',
+            'payment_method',
+            'reason',
+            'comment',
+            'order',
+            'cash_register',
+        ]
         widgets = {
-            'comment': forms.Textarea(attrs={'rows': 3}),
-            'category': forms.Select(attrs={'class': 'form-select'}),
-            'order': forms.Select(attrs={'class': 'form-select'}),
-            'cash_register': forms.Select(attrs={'class': 'form-select'}),
+            'operation_type': forms.Select(
+                attrs={
+                    'class': 'form-select',
+                    'id': 'transaction-operation-type',
+                }
+            ),
+            'category': forms.Select(
+                attrs={
+                    'class': 'form-select',
+                    'id': 'transaction-category',
+                }
+            ),
+            'amount': forms.NumberInput(
+                attrs={
+                    'class': 'form-control',
+                    'step': '0.1',
+                    'min': '0.1',
+                    'placeholder': '0.0',
+                }
+            ),
+
+            'payment_method': forms.Select(
+                attrs={
+                    'class': 'form-select',
+                }
+            ),
+
+            'reason': forms.TextInput(
+                attrs={
+                    'class': 'form-control',
+                    'placeholder': 'Например: Счёт №152 от ООО Ромашка',
+                }
+            ),
+
+            'comment': forms.Textarea(
+                attrs={
+                    'class': 'form-control',
+                    'rows': 3,
+                    'placeholder': 'Дополнительная информация...',
+                }
+            ),
+
+            'order': forms.Select(
+                attrs={
+                    'class': 'form-select',
+                }
+            ),
+
+            'cash_register': forms.Select(
+                attrs={
+                    'class': 'form-select',
+                }
+            ),
         }
+
         labels = {
             'operation_type': 'Тип операции',
-            'amount': 'Сумма (₽)',
+            'category': 'Категория',
+            'amount': 'Сумма',
             'payment_method': 'Способ оплаты',
             'reason': 'Основание',
             'comment': 'Комментарий',
-            'order': 'Заказ (опционально)',
+            'order': 'Заказ',
             'cash_register': 'Касса',
         }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.helper = FormHelper()
-        self.helper.form_tag = False
-        self.fields['category'].required = True
-
-        # Ограничиваем выбор заказов только незакрытыми
-        self.fields['order'].queryset = Order.objects.filter(status__in=['draft', 'in_progress', 'awaiting_parts'])
-
 
 class CashRegisterForm(forms.ModelForm):
     class Meta:

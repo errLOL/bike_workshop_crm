@@ -217,7 +217,7 @@ class Order(BaseModel):
         else:
             return 'unpaid'
 
-    def add_payment(self,  amount, payment_method, employee, comment='', cash_register=None):
+    def add_payment(self, cash_category, amount, payment_method, employee, comment='', cash_register=None):
         with transaction.atomic():
             if cash_register is None:
                 cash_register = CashRegister.objects.filter(is_active=True).first()
@@ -233,6 +233,7 @@ class Order(BaseModel):
             CashTransaction.objects.create(
                 order_payment=payment,
                 order=self,
+                category=cash_category,
                 employee=employee,
                 operation_type='income',
                 amount=amount,
