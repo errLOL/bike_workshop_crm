@@ -276,3 +276,82 @@ def calculate_formset_totals(formset):
             parts_total += Decimal(subtotal)
 
     return services_total, parts_total
+
+def get_client_ip(request):
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0]
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
+
+IGNORED_FIELDS = {
+    'updated_at',
+    'created_at',
+    'id',
+}
+
+def build_changes(old_data: dict, new_data: dict, ignore: set | None = None) -> dict:
+    """
+    Сравнивает два словаря и возвращает словарь изменений.
+
+    Формат:
+      - обычное изменение: {'old': ..., 'new': ...}
+      - добавление:        {'added': True, ...все поля нового элемента}
+      - удаление:          {'deleted': True, ...все поля старого элемента}
+
+    Для вложенных словарей (например, order_items) формирует ключи
+    вида 'order_items.<product_id>.<field>' и корректно обрабатывает
+    появление/исчезновение целых элементов.
+    """
+    ignore = ignore or IGNORED_FIELDS
+    changes = {}
+
+    def _is_leaf_dict(d):
+        """Словарь считается листом, если все его значения — не dict."""
+        return all(not isinstance(v, dict) for v in d.values())
+
+    def _compare(prefix, old_val, new_val):
+        # Оба — словари
+        if isinstance(old_val, dict) and isinstance(new_val, dict):
+            # Лист — сравниваем по полям
+            if _is_leaf_dict(old_val) or _is_leaf_dict(new_val):
+                all_keys = set(old_val.keys()) | set(new_val.keys())
+                for k in all_keys:
+                    if k in ignore:
+                        continue
+                    ov = old_val.get(k)
+                    nv = new_val.get(k)
+                    if ov != nv:
+                        key = f'{prefix}.{k}' if prefix else str(k)
+                        if "order_items" in prefix:
+                            key = new_val.get("product_name")
+                        changes[key] = {'old': ov, 'new': nv}
+                return
+
+            # Ветка (например, order_items) — рекурсивно
+            all_keys = set(old_val.keys()) | set(new_val.keys())
+            for k in all_keys:
+                key = f'{prefix}.{k}' if prefix else str(k)
+                _compare(key, old_val.get(k), new_val.get(k))
+            return
+
+        # Один из них — словарь, другой None/отсутствует → добавление/удаление
+        if isinstance(old_val, dict) and new_val is None:
+            changes[prefix] = {'deleted': True, **old_val}
+            return
+        if old_val is None and isinstance(new_val, dict):
+            changes[prefix] = {'added': True, **new_val}
+            return
+
+        # Скаляры
+        if old_val != new_val:
+            changes[prefix] = {'old': old_val, 'new': new_val}
+
+    all_top = set(old_data.keys()) | set(new_data.keys())
+    for k in all_top:
+        if k in ignore:
+            continue
+        _compare(str(k), old_data.get(k), new_data.get(k))
+
+    return changes

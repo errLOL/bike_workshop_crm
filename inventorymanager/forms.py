@@ -2,6 +2,7 @@ import re
 
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Row, Column, Field
+from django.db.models import Q
 from django.forms import inlineformset_factory, Select
 from django import forms
 from .models import *
@@ -212,25 +213,17 @@ class CategoryForm(forms.ModelForm):
 
 class CashTransactionForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
+        instance = kwargs.get('instance')
         super().__init__(*args, **kwargs)
         self.fields['category'].required = True
-
-
-        self.fields['category'].queryset = CashCategory.objects.filter(
-            is_active=True
-        ).order_by(
+        self.fields['category'].queryset = CashCategory.objects.filter(is_active=True).order_by(
             'category_type',
             'sort_order',
             'name'
         )
 
-        self.fields['order'].queryset = Order.objects.filter(
-            status__in=[
-                'draft',
-                'in_progress',
-                'awaiting_parts',
-                'ready',
-            ]).order_by('-id')
+        if instance and instance.order:
+            self.fields['order'].queryset = Order.objects.filter(pk=instance.order.id)
 
     def clean(self):
         cleaned_data = super().clean()

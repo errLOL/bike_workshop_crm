@@ -618,7 +618,7 @@
                                     </td>
                                     <td class="text-end">
                                         <button type="button"
-                                                class="btn border btn btn-outline-dark action-btn edit-cash-transaction"
+                                                class="btn btn-outline-dark action-btn edit-cash-transaction"
                                                 data-transaction-id="{{ transaction.id }}"
                                                 title="Редактировать">
                                             <i class="fas fa-edit"></i>
@@ -698,9 +698,7 @@
         </div>
     </div>
 
-    <!-- ========================================================= -->
-    <!-- MODAL: Кассовая операция                                  -->
-    <!-- ========================================================= -->
+    <!-- Modal: Кассовая операция -->
     <div class="modal fade"
          id="cashTransactionModal"
          tabindex="-1"
@@ -708,7 +706,6 @@
          aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content border-0 shadow-lg">
-                <!-- HEADER -->
                 <div class="modal-header px-4 py-3">
                     <div>
                         <h5 class="modal-title fw-semibold" id="cashTransactionModalLabel">
@@ -724,16 +721,12 @@
                             aria-label="Закрыть"></button>
                 </div>
 
-                <!-- BODY -->
                 <div class="modal-body px-4 py-4">
                     <form id="cashTransactionForm" novalidate>
                         {% csrf_token %}
                         <input type="hidden" id="transaction-id" value="">
-
-                        <!-- Ошибки -->
                         <div id="transaction-form-alert" class="alert alert-danger d-none mb-4"></div>
 
-                        <!-- Тип операции -->
                         <div class="mb-4">
                             <label class="form-label fw-semibold">Тип операции</label>
                             <div class="row g-2">
@@ -764,7 +757,6 @@
                         </div>
 
                         <div class="row g-3">
-                            <!-- Категория -->
                             <div class="col-md-6">
                                 <label for="transaction-category" class="form-label fw-semibold">
                                     Категория <span class="text-danger">*</span>
@@ -782,7 +774,6 @@
                                 <div class="invalid-feedback">Выберите категорию.</div>
                             </div>
 
-                            <!-- Сумма -->
                             <div class="col-md-6">
                                 <label for="transaction-amount" class="form-label fw-semibold">
                                     Сумма <span class="text-danger">*</span>
@@ -801,7 +792,6 @@
                                 <div class="invalid-feedback">Укажите сумму.</div>
                             </div>
 
-                            <!-- Способ оплаты -->
                             <div class="col-md-6">
                                 <label for="transaction-payment-method" class="form-label fw-semibold">
                                     Способ оплаты<span class="text-danger">*</span>
@@ -816,7 +806,6 @@
                                 </select>
                             </div>
 
-                            <!-- Заказ -->
                             <div class="col-md-6">
                                 <label for="transaction-order" class="form-label fw-semibold">
                                     Заказ
@@ -830,7 +819,6 @@
                                 </select>
                             </div>
 
-                            <!-- Основание -->
                             <div class="col-12">
                                 <label for="transaction-reason" class="form-label fw-semibold">
                                     Основание
@@ -846,20 +834,22 @@
                                 <div class="invalid-feedback">Укажите основание операции.</div>
                             </div>
 
-                            <!-- Комментарий -->
                             <div class="col-12">
                                 <label for="transaction-comment" class="form-label fw-semibold">
                                     Комментарий
                                     <span class="text-muted fw-normal">(необязательно)</span>
                                 </label>
-                                <textarea class="form-control" id="transaction-comment" name="comment" rows="3" placeholder="Дополнительная информация...">
-                            </textarea>
+                                <textarea class="form-control"
+                                          id="transaction-comment"
+                                          name="comment"
+                                          rows="3"
+                                          maxlength="500"
+                                          placeholder="Дополнительная информация..."></textarea>
                             </div>
                         </div>
                     </form>
                 </div>
 
-                <!-- FOOTER -->
                 <div class="modal-footer px-4 py-3 bg-light">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button>
                     <button type="button"
@@ -874,597 +864,350 @@
     </div>
 
     {{ cash_flow_data|json_script:"cash-flow-data" }}
+
+    {# URL-шаблоны для JS, чтобы не хардкодить пути #}
+    <div id="cash-urls"
+         class="d-none"
+         data-create-url="{% url 'cash_transaction_create' %}"
+         data-edit-url-template="{% url 'cash_transaction_edit' 0 %}"
+         data-detail-url-template="{% url 'cash_transaction_detail' 0 %}"></div>
 {% endblock %}
 
 {% block extra_js %}
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            const modalElement = document.getElementById(
-                'cashTransactionModal'
-            );
-
+            const modalElement = document.getElementById('cashTransactionModal');
             if (!modalElement) {
                 return;
             }
 
+            const urlsElement = document.getElementById('cash-urls');
+            const URLS = {
+                create: urlsElement ? urlsElement.dataset.createUrl : '',
+                editTemplate: urlsElement ? urlsElement.dataset.editUrlTemplate : '',
+                detailTemplate: urlsElement ? urlsElement.dataset.detailUrlTemplate : ''
+            };
+
+            function buildUrl(template, id) {
+                console.log(template)
+                console.log(id)
+                if (!template) return '';
+                return template.replace(/0\/?/, id + '/');
+            }
+
             const modal = new bootstrap.Modal(modalElement);
 
-            const form = document.getElementById(
-                'cashTransactionForm'
-            );
+            const form = document.getElementById('cashTransactionForm');
+            const modalTitle = document.getElementById('cashTransactionModalTitle');
+            const modalIcon = document.getElementById('cashTransactionModalIcon');
+            const saveButton = document.getElementById('saveCashTransactionBtn');
+            const saveButtonText = document.getElementById('saveCashTransactionText');
+            const alertBox = document.getElementById('transaction-form-alert');
+            const transactionId = document.getElementById('transaction-id');
+            const categorySelect = document.getElementById('transaction-category');
+            const amountInput = document.getElementById('transaction-amount');
+            const paymentMethodSelect = document.getElementById('transaction-payment-method');
+            const reasonInput = document.getElementById('transaction-reason');
+            const commentInput = document.getElementById('transaction-comment');
+            const orderSelect = document.getElementById('transaction-order');
+            const operationIncome = document.getElementById('operation-income');
+            const operationExpense = document.getElementById('operation-expense');
 
-            const modalTitle = document.getElementById(
-                'cashTransactionModalTitle'
-            );
+            if (!operationIncome || !operationExpense || !categorySelect || !orderSelect) {
+                console.error('Не найдены обязательные поля формы кассовой операции.');
+                return;
+            }
 
-            const modalIcon = document.getElementById(
-                'cashTransactionModalIcon'
-            );
-
-            const saveButton = document.getElementById(
-                'saveCashTransactionBtn'
-            );
-
-            const saveButtonText = document.getElementById(
-                'saveCashTransactionText'
-            );
-
-            const alertBox = document.getElementById(
-                'transaction-form-alert'
-            );
-
-            const transactionId = document.getElementById(
-                'transaction-id'
-            );
-
-            const categorySelect = document.getElementById(
-                'transaction-category'
-            );
-
-            const amountInput = document.getElementById(
-                'transaction-amount'
-            );
-
-            const paymentMethodSelect = document.getElementById(
-                'transaction-payment-method'
-            );
-
-            const reasonInput = document.getElementById(
-                'transaction-reason'
-            );
-
-            const commentInput = document.getElementById(
-                'transaction-comment'
-            );
-
-            const orderSelect = document.getElementById(
-                'transaction-order'
-            );
-
-            const operationIncome = document.getElementById(
-                'operation-income'
-            );
-
-            const operationExpense = document.getElementById(
-                'operation-expense'
-            );
-
-            /*
-             * ---------------------------------------------------------
+            /* ---------------------------------------------------------
              * CSRF
-             * ---------------------------------------------------------
-             */
-
+             * --------------------------------------------------------- */
             function getCsrfToken() {
-
-                const csrfInput = form.querySelector(
-                    '[name="csrfmiddlewaretoken"]'
-                );
-
+                const csrfInput = form.querySelector('[name="csrfmiddlewaretoken"]');
                 return csrfInput ? csrfInput.value : '';
             }
 
-            /*
-             * ---------------------------------------------------------
-             * URL
-             * ---------------------------------------------------------
-             */
-
-            function getCreateUrl() {
-
-                return "{% url 'cash_transaction_create' %}";
-
-            }
-
-            function getEditUrl(id) {
-
-                return "{% url 'cash_transaction_edit' 0 %}"
-                    .replace('/0/', '/' + id + '/');
-
-            }
-
-            /*
-             * ---------------------------------------------------------
+            /* ---------------------------------------------------------
              * Тип операции
-             * ---------------------------------------------------------
-             */
-
+             * --------------------------------------------------------- */
             function getOperationType() {
-
-                if (operationExpense.checked) {
-                    return 'expense';
-                }
-
-                return 'income';
+                return operationExpense.checked ? 'expense' : 'income';
             }
 
-            /*
-             * ---------------------------------------------------------
-             * Фильтрация категорий
-             * ---------------------------------------------------------
-             */
+            /* ---------------------------------------------------------
+             * Иконка модалки
+             * --------------------------------------------------------- */
+            function setModalIcon(mode) {
+                modalIcon.classList.remove('fa-plus-circle', 'fa-edit');
+                modalIcon.classList.add(mode === 'edit' ? 'fa-edit' : 'fa-plus-circle');
+            }
 
-            function filterCategories(
-                selectedCategoryId = null
-            ) {
-
+            /* ---------------------------------------------------------
+             * Фильтрация категорий по типу операции
+             * --------------------------------------------------------- */
+            function filterCategories(selectedCategoryId = null) {
                 const operationType = getOperationType();
+                let target = null;
 
-                let hasSelectedCategory = false;
-
-                Array.from(
-                    categorySelect.options
-                ).forEach(function(option) {
-
+                Array.from(categorySelect.options).forEach(function(option) {
                     if (!option.value) {
                         option.hidden = false;
                         option.disabled = false;
                         return;
                     }
 
-                    const categoryType =
-                        option.dataset.type;
-
-                    const isCorrectType =
-                        categoryType === operationType;
-
+                    const isCorrectType = option.dataset.type === operationType;
                     option.hidden = !isCorrectType;
                     option.disabled = !isCorrectType;
 
-                    if (
-                        isCorrectType &&
+                    if (isCorrectType &&
                         selectedCategoryId !== null &&
-                        String(option.value) ===
-                        String(selectedCategoryId)
-                    ) {
-                        option.selected = true;
-                        hasSelectedCategory = true;
+                        String(option.value) === String(selectedCategoryId)) {
+                        target = option;
                     }
-
                 });
 
-                /*
-                 * Если выбранная категория не соответствует
-                 * типу операции — сбрасываем её.
-                 */
+                categorySelect.value = target ? target.value : '';
+            }
+            function setOrderSelectValue(orderId, orderLabel) {
+                orderSelect.value = '';
+                if (!orderId) return;
 
-                if (!hasSelectedCategory) {
-                    categorySelect.value = '';
+                const stringId = String(orderId);
+                let option = Array.from(orderSelect.options)
+                    .find(function(opt) { return opt.value === stringId; });
+
+                if (!option) {
+                    option = document.createElement('option');
+                    option.value = stringId;
+                    option.textContent = orderLabel ? orderLabel : ('Заказ #' + stringId);
+                    option.dataset.dynamic = '1';
+                    orderSelect.appendChild(option);
                 }
 
+                option.selected = true;
+                orderSelect.value = stringId;
             }
 
-            /*
-             * ---------------------------------------------------------
+            /* ---------------------------------------------------------
+             * Удаление динамически добавленных опций заказа
+             * --------------------------------------------------------- */
+            function clearDynamicOrderOptions() {
+                Array.from(orderSelect.querySelectorAll('option[data-dynamic="1"]'))
+                    .forEach(function(opt) { opt.remove(); });
+            }
+
+            /* ---------------------------------------------------------
              * Переключение Приход / Расход
-             * ---------------------------------------------------------
-             */
+             * --------------------------------------------------------- */
+            operationIncome.addEventListener('change', function() {
+                if (this.checked) filterCategories();
+            });
 
-            operationIncome.addEventListener(
-                'change',
-                function() {
+            operationExpense.addEventListener('change', function() {
+                if (this.checked) filterCategories();
+            });
 
-                    if (this.checked) {
-                        filterCategories();
-                    }
-
-                }
-            );
-
-            operationExpense.addEventListener(
-                'change',
-                function() {
-
-                    if (this.checked) {
-                        filterCategories();
-                    }
-
-                }
-            );
-
-            /*
-             * ---------------------------------------------------------
+            /* ---------------------------------------------------------
              * Сброс формы
-             * ---------------------------------------------------------
-             */
-
+             * --------------------------------------------------------- */
             function resetForm() {
-
                 form.reset();
-
                 transactionId.value = '';
-
                 operationIncome.checked = true;
                 operationExpense.checked = false;
-
                 paymentMethodSelect.value = 'cash';
-
                 categorySelect.value = '';
-
+                clearDynamicOrderOptions();
                 orderSelect.value = '';
 
                 alertBox.classList.add('d-none');
-                alertBox.innerHTML = '';
+                alertBox.textContent = '';
 
-                form.querySelectorAll('.is-invalid')
-                    .forEach(function(element) {
-                        element.classList.remove('is-invalid');
-                    });
+                form.querySelectorAll('.is-invalid').forEach(function(element) {
+                    element.classList.remove('is-invalid');
+                });
+
+                form.classList.remove('was-validated');
 
                 filterCategories();
-
             }
 
-            /*
-             * ---------------------------------------------------------
+            /* ---------------------------------------------------------
              * Новая операция
-             * ---------------------------------------------------------
-             */
-
-            const newButton = document.getElementById(
-                'newCashTransactionBtn'
-            );
-
+             * --------------------------------------------------------- */
+            const newButton = document.getElementById('newCashTransactionBtn');
             if (newButton) {
-
-                newButton.addEventListener(
-                    'click',
-                    function() {
-
-                        resetForm();
-                        modalTitle.textContent =
-                            'Новая операция';
-
-                        modalIcon.className =
-                            'fas fa-plus-circle me-2 text-primary';
-
-                        saveButtonText.textContent =
-                            'Сохранить';
-                        modal.show();
-                    }
-                );
+                newButton.addEventListener('click', function() {
+                    resetForm();
+                    modalTitle.textContent = 'Новая операция';
+                    setModalIcon('create');
+                    saveButtonText.textContent = 'Сохранить';
+                    modal.show();
+                });
             }
 
-            document.querySelectorAll(
-                '.edit-cash-transaction'
-            ).forEach(function(button) {
+            /* ---------------------------------------------------------
+             * Редактирование
+             * --------------------------------------------------------- */
+            document.querySelectorAll('.edit-cash-transaction').forEach(function(button) {
+                button.addEventListener('click', async function() {
+                    const id = this.dataset.transactionId;
+                    if (!id) return;
+                    console.log("datasetId:", id)
+                    resetForm();
+                    modalTitle.textContent = 'Редактирование операции';
+                    setModalIcon('edit');
+                    saveButtonText.textContent = 'Сохранить изменения';
 
-                button.addEventListener(
-                    'click',
-                    async function() {
+                    try {
+                        const response = await fetch(buildUrl(URLS.editTemplate, id), {
+                            method: 'GET',
+                            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                        });
 
-                        const id =
-                            this.dataset.transactionId;
+                        const data = await response.json();
 
-                        if (!id) {
+                        if (!response.ok || !data.success) {
+                            showError(data.message || 'Не удалось загрузить операцию.');
                             return;
                         }
-                        resetForm();
-                        modalTitle.textContent =
-                            'Редактирование операции';
 
-                        modalIcon.className =
-                            'fas fa-edit me-2 text-primary';
+                        transactionId.value = data.id;
 
-                        saveButtonText.textContent =
-                            'Сохранить изменения';
-
-                        try {
-
-                            const response =
-                                await fetch(
-                                    getEditUrl(id), {
-                                        method: 'GET',
-                                        headers: {
-                                            'X-Requested-With': 'XMLHttpRequest'
-                                        }
-                                    }
-                                );
-
-                            const data =
-                                await response.json();
-
-                            if (!response.ok || !data.success) {
-                                showError(
-                                    data.message ||
-                                    'Не удалось загрузить операцию.'
-                                );
-                                return;
-                            }
-                            transactionId.value = data.id;
-
-                            if (
-                                data.operation_type ===
-                                'expense'
-                            ) {
-                                operationExpense.checked =
-                                    true;
-                            } else {
-                                operationIncome.checked =
-                                    true;
-                            }
-
-                            filterCategories(
-                                data.category_id
-                            );
-
-                            amountInput.value =
-                                data.amount || '';
-
-                            paymentMethodSelect.value =
-                                data.payment_method || 'cash';
-
-                            reasonInput.value =
-                                data.reason || '';
-
-                            commentInput.value =
-                                data.comment || '';
-
-                            orderSelect.value =
-                                data.order_id || '';
-
-                            modal.show();
-
-                        } catch (error) {
-
-                            console.error(error);
-
-                            showError(
-                                'Ошибка при загрузке операции.'
-                            );
-
+                        if (data.operation_type === 'expense') {
+                            operationExpense.checked = true;
+                        } else {
+                            operationIncome.checked = true;
                         }
 
-                    }
-                );
+                        filterCategories(data.category_id);
+                        amountInput.value = data.amount || '';
+                        paymentMethodSelect.value = data.payment_method || 'cash';
+                        reasonInput.value = data.reason || '';
+                        commentInput.value = data.comment || '';
+                        setOrderSelectValue(data.order_id, data.order_label);
 
+                        modal.show();
+                    } catch (error) {
+                        console.error(error);
+                        showError('Ошибка при загрузке операции.');
+                    }
+                });
             });
 
-            /*
-             * ---------------------------------------------------------
+            /* ---------------------------------------------------------
              * Ошибки
-             * ---------------------------------------------------------
-             */
-
+             * --------------------------------------------------------- */
             function showError(message) {
-
-                alertBox.innerHTML = message;
-
-                alertBox.classList.remove(
-                    'd-none'
-                );
-
+                alertBox.textContent = message;
+                alertBox.classList.remove('d-none');
             }
 
             function showValidationErrors(errors) {
-
-                let html = '';
-
-                form.querySelectorAll(
-                    '.is-invalid'
-                ).forEach(function(element) {
-
-                    element.classList.remove(
-                        'is-invalid'
-                    );
-
+                alertBox.textContent = '';
+                form.querySelectorAll('.is-invalid').forEach(function(element) {
+                    element.classList.remove('is-invalid');
                 });
 
-                Object.keys(errors).forEach(
-                    function(fieldName) {
+                const fragment = document.createDocumentFragment();
+                let hasErrors = false;
 
-                        errors[fieldName].forEach(
-                            function(error) {
+                Object.keys(errors).forEach(function(fieldName) {
+                    errors[fieldName].forEach(function(error) {
+                        hasErrors = true;
+                        const div = document.createElement('div');
+                        div.textContent = (error && error.message) ? error.message : String(error);
+                        fragment.appendChild(div);
+                    });
 
-                                html +=
-                                    '<div>' +
-                                    error.message +
-                                    '</div>';
-
-                            }
-                        );
-
-                        let field;
-
-                        if (fieldName === 'operation_type') {
-
-                            field = operationIncome;
-
-                        } else {
-
-                            field =
-                                form.querySelector(
-                                    '[name="' +
-                                    fieldName +
-                                    '"]'
-                                );
-
-                        }
-
-                        if (field) {
-
-                            field.classList.add(
-                                'is-invalid'
-                            );
-
-                        }
-
+                    let field;
+                    if (fieldName === 'operation_type') {
+                        field = operationIncome;
+                    } else {
+                        field = form.querySelector('[name="' + fieldName + '"]');
                     }
-                );
+                    if (field) field.classList.add('is-invalid');
+                });
 
-                if (!html) {
-
-                    html =
-                        'Проверьте заполнение формы.';
-
+                if (!hasErrors) {
+                    const div = document.createElement('div');
+                    div.textContent = 'Проверьте заполнение формы.';
+                    fragment.appendChild(div);
                 }
 
-                showError(html);
-
+                alertBox.appendChild(fragment);
+                alertBox.classList.remove('d-none');
             }
 
-            /*
-             * ---------------------------------------------------------
+            /* ---------------------------------------------------------
              * Сохранение
-             * ---------------------------------------------------------
-             */
+             * --------------------------------------------------------- */
+            saveButton.addEventListener('click', async function() {
+                alertBox.classList.add('d-none');
+                alertBox.textContent = '';
 
-            saveButton.addEventListener(
-                'click',
-                async function() {
-
-                    alertBox.classList.add(
-                        'd-none'
-                    );
-
-                    /*
-                     * Простая клиентская проверка
-                     */
-
-                    if (!form.checkValidity()) {
-
-                        form.classList.add(
-                            'was-validated'
-                        );
-
-                        return;
-
-                    }
-
-                    /*
-                     * URL зависит от режима
-                     */
-
-                    const id =
-                        transactionId.value;
-
-                    const url = id ?
-                        getEditUrl(id) :
-                        getCreateUrl();
-
-                    /*
-                     * Блокируем кнопку
-                     */
-
-                    saveButton.disabled = true;
-
-                    saveButtonText.textContent =
-                        'Сохранение...';
-
-                    try {
-
-                        const formData =
-                            new FormData(form);
-
-                        const response =
-                            await fetch(
-                                url, {
-                                    method: 'POST',
-
-                                    headers: {
-                                        'X-CSRFToken': getCsrfToken(),
-
-                                        'X-Requested-With': 'XMLHttpRequest'
-                                    },
-
-                                    body: formData
-                                }
-                            );
-
-                        const data =
-                            await response.json();
-
-                        if (
-                            !response.ok ||
-                            !data.success
-                        ) {
-
-                            if (data.errors) {
-
-                                showValidationErrors(
-                                    data.errors
-                                );
-
-                            } else {
-
-                                showError(
-                                    data.message ||
-                                    'Не удалось сохранить операцию.'
-                                );
-
-                            }
-
-                            return;
-
-                        }
-
-                        /*
-                         * Успешно.
-                         */
-
-                        modal.hide();
-
-                        /*
-                         * Перезагружаем страницу,
-                         * чтобы обновились:
-                         *
-                         * - KPI
-                         * - графики
-                         * - таблица
-                         * - баланс
-                         */
-
-                        window.location.reload();
-
-                    } catch (error) {
-
-                        console.error(error);
-
-                        showError(
-                            'Произошла ошибка при сохранении.'
-                        );
-
-                    } finally {
-
-                        saveButton.disabled = false;
-
-                        saveButtonText.textContent =
-                            id ?
-                            'Сохранить изменения' :
-                            'Сохранить';
-
-                    }
-
+                if (!form.checkValidity()) {
+                    form.classList.add('was-validated');
+                    return;
                 }
-            );
 
-            /*
-             * ---------------------------------------------------------
-             * Начальное состояние категорий
-             * ---------------------------------------------------------
-             */
+                const id = transactionId.value;
+                const url = id
+                    ? buildUrl(URLS.editTemplate, id)
+                    : URLS.create;
 
+                if (!url) {
+                    showError('Не удалось определить адрес сохранения.');
+                    return;
+                }
+
+                saveButton.disabled = true;
+                saveButtonText.textContent = 'Сохранение...';
+
+                try {
+                    const formData = new FormData(form);
+
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': getCsrfToken(),
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: formData
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok || !data.success) {
+                        if (data.errors) {
+                            showValidationErrors(data.errors);
+                        } else {
+                            showError(data.message || 'Не удалось сохранить операцию.');
+                        }
+                        return;
+                    }
+
+                    modal.hide();
+                    window.location.reload();
+                } catch (error) {
+                    console.error(error);
+                    showError('Произошла ошибка при сохранении.');
+                } finally {
+                    saveButton.disabled = false;
+                    saveButtonText.textContent = id
+                        ? 'Сохранить изменения'
+                        : 'Сохранить';
+                }
+            });
+
+            /* ---------------------------------------------------------
+             * Начальное состояние
+             * --------------------------------------------------------- */
             filterCategories();
+
+            /* =========================================================
+             * Графики
+             * ========================================================= */
             const dataElement = document.getElementById('cash-flow-data');
             if (!dataElement) return;
 
@@ -1484,9 +1227,7 @@
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: {
-                        display: false
-                    },
+                    legend: { display: false },
                     tooltip: {
                         callbacks: {
                             label: context => `${context.dataset.label || 'Сумма'}: ${formatMoney(context.raw)}`
@@ -1499,22 +1240,16 @@
                         ticks: {
                             callback: value => Number(value).toLocaleString('ru-RU') + ' ₽'
                         },
-                        grid: {
-                            color: 'rgba(148,163,184,.12)'
-                        }
+                        grid: { color: 'rgba(148,163,184,.12)' }
                     },
                     y: {
-                        grid: {
-                            display: false
-                        },
-                        ticks: {
-                            autoSkip: false
-                        }
+                        grid: { display: false },
+                        ticks: { autoSkip: false }
                     }
                 }
             };
 
-            // Основной график движения денег
+            // Основной график
             const flowCanvas = document.getElementById('cashFlowChart');
             if (flowCanvas) {
                 new Chart(flowCanvas, {
@@ -1550,14 +1285,9 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        interaction: {
-                            mode: 'index',
-                            intersect: false
-                        },
+                        interaction: { mode: 'index', intersect: false },
                         plugins: {
-                            legend: {
-                                display: true
-                            },
+                            legend: { display: true },
                             tooltip: {
                                 callbacks: {
                                     label: context => `${context.dataset.label}: ${formatMoney(context.raw)}`
@@ -1575,11 +1305,12 @@
                 });
             }
 
-            // Категории приходов — горизонтальный bar chart, один цвет
+            // Категории приходов
             const incomeCategoryCanvas = document.getElementById('incomeCategoryChart');
             if (incomeCategoryCanvas) {
                 const labels = cashFlowData.income_category_labels || [];
                 const values = cashFlowData.income_by_category || [];
+                const total = values.reduce((s, v) => s + Number(v || 0), 0);
                 const maxHeight = Math.max(260, labels.length * 38);
                 incomeCategoryCanvas.parentElement.style.height = maxHeight + 'px';
 
@@ -1609,7 +1340,6 @@
                                 callbacks: {
                                     label: context => `Приход: ${formatMoney(context.raw)}`,
                                     afterLabel: context => {
-                                        const total = values.reduce((sum, value) => sum + Number(value || 0), 0);
                                         if (!total) return '';
                                         return `Доля: ${(Number(context.raw || 0) / total * 100).toFixed(1)}%`;
                                     }
@@ -1620,11 +1350,12 @@
                 });
             }
 
-            // Категории расходов — горизонтальный bar chart, один цвет
+            // Категории расходов
             const expenseCategoryCanvas = document.getElementById('expenseCategoryChart');
             if (expenseCategoryCanvas) {
                 const labels = cashFlowData.expense_category_labels || [];
                 const values = cashFlowData.expense_by_category || [];
+                const total = values.reduce((s, v) => s + Number(v || 0), 0);
                 const maxHeight = Math.max(300, labels.length * 38);
                 expenseCategoryCanvas.parentElement.style.height = maxHeight + 'px';
 
@@ -1654,7 +1385,6 @@
                                 callbacks: {
                                     label: context => `Расход: ${formatMoney(context.raw)}`,
                                     afterLabel: context => {
-                                        const total = values.reduce((sum, value) => sum + Number(value || 0), 0);
                                         if (!total) return '';
                                         return `Доля: ${(Number(context.raw || 0) / total * 100).toFixed(1)}%`;
                                     }
@@ -1665,7 +1395,7 @@
                 });
             }
 
-            // Способы оплаты — только 3 реальных значения CashTransaction
+            // Способы оплаты
             const methodLabels = cashFlowData.method_labels || ['Наличные', 'Карта', 'Перевод'];
             const methodColors = ['#22c55e', '#3b82f6', '#8b5cf6'];
 
@@ -1690,9 +1420,7 @@
                         maintainAspectRatio: false,
                         cutout: '68%',
                         plugins: {
-                            legend: {
-                                position: 'bottom'
-                            },
+                            legend: { position: 'bottom' },
                             tooltip: {
                                 callbacks: {
                                     label: context => `${context.label}: ${formatMoney(context.raw)}`
@@ -1742,79 +1470,105 @@
             });
         });
 
+        /* =========================================================
+         * Детали операции (drawer)
+         * ========================================================= */
         function showDetails(transactionId) {
             const body = document.getElementById('transactionDetails');
-            body.innerHTML = `
-        <div class="text-center py-5 text-muted">
-            <div class="spinner-border"></div>
-        </div>`;
+            body.innerHTML = '';
 
-            fetch(`/cash-transaction/detail/${transactionId}`)
+            const spinner = document.createElement('div');
+            spinner.className = 'text-center py-5 text-muted';
+            spinner.innerHTML = '<div class="spinner-border"></div>';
+            body.appendChild(spinner);
+
+            const urlsElement = document.getElementById('cash-urls');
+            const detailTemplate = urlsElement ? urlsElement.dataset.detailUrlTemplate : '';
+            const url = detailTemplate
+                ? detailTemplate.replace(/0\/?/, transactionId + '/')
+                : '';
+
+            if (!url) {
+                body.innerHTML = '<div class="alert alert-danger">Не удалось определить адрес запроса.</div>';
+                return;
+            }
+
+            fetch(url)
                 .then(response => {
                     if (!response.ok) throw new Error('Не удалось загрузить операцию');
                     return response.json();
                 })
                 .then(data => {
-                    const income = data.operation_type === 'income';
-                    const category = data.category || data.category_name || 'Без категории';
-                    console.log(data.operation_type)
-                    const orderHtml = data.order ? `
-                <div class="detail-row">
-                    <div class="detail-label">Заказ</div>
-                    <div class="detail-value">#${escapeHtml(String(data.order))}</div>
-                </div>` : '';
-
-                    body.innerHTML = `
-                <div class="text-center py-3 mb-2">
-                    <div class="detail-amount ${income ? 'text-income' : 'text-expense'}">
-                        ${income ? '+' : '−'}${escapeHtml(String(data.amount || '0'))} ₽
-                    </div>
-                    <div class="text-muted mt-1">${escapeHtml(data.operation_type_display || '')}</div>
-                </div>
-
-                <div class="detail-row">
-                    <div class="detail-label">Категория</div>
-                    <div class="detail-value">${escapeHtml(category)}</div>
-                </div>
-                <div class="detail-row">
-                    <div class="detail-label">Дата и время</div>
-                    <div class="detail-value">${escapeHtml(data.created_at || '—')}</div>
-                </div>
-                <div class="detail-row">
-                    <div class="detail-label">Способ оплаты</div>
-                    <div class="detail-value">${escapeHtml(data.payment_method_display || '—')}</div>
-                </div>
-                <div class="detail-row">
-                    <div class="detail-label">Основание</div>
-                    <div class="detail-value">${escapeHtml(data.reason || '—')}</div>
-                </div>
-                <div class="detail-row">
-                    <div class="detail-label">Комментарий</div>
-                    <div class="detail-value">${escapeHtml(data.comment || '—')}</div>
-                </div>
-                <div class="detail-row">
-                    <div class="detail-label">Сотрудник</div>
-                    <div class="detail-value">${escapeHtml(data.employee || '—')}</div>
-                </div>
-                ${orderHtml}
-                <div class="detail-row">
-                    <div class="detail-label">Касса</div>
-                    <div class="detail-value">${escapeHtml(data.cash_register || '—')}</div>
-                </div>`;
-
-                    bootstrap.Modal.getOrCreateInstance(document.getElementById('transactionModal')).show();
+                    renderDetails(body, data);
+                    bootstrap.Modal.getOrCreateInstance(
+                        document.getElementById('transactionModal')
+                    ).show();
                 })
                 .catch(error => {
-                    body.innerHTML = `<div class="alert alert-danger">Не удалось загрузить данные операции.</div>`;
-                    bootstrap.Modal.getOrCreateInstance(document.getElementById('transactionModal')).show();
+                    body.innerHTML = '';
+                    const alert = document.createElement('div');
+                    alert.className = 'alert alert-danger';
+                    alert.textContent = 'Не удалось загрузить данные операции.';
+                    body.appendChild(alert);
+                    bootstrap.Modal.getOrCreateInstance(
+                        document.getElementById('transactionModal')
+                    ).show();
                     console.error(error);
                 });
         }
 
-        function escapeHtml(value) {
-            const div = document.createElement('div');
-            div.textContent = value == null ? '' : String(value);
-            return div.innerHTML;
+        function renderDetails(body, data) {
+            const income = data.operation_type === 'income';
+            const category = data.category || data.category_name || 'Без категории';
+
+            body.innerHTML = '';
+
+            // Заголовок с суммой
+            const head = document.createElement('div');
+            head.className = 'text-center py-3 mb-2';
+
+            const amountDiv = document.createElement('div');
+            amountDiv.className = 'detail-amount ' + (income ? 'text-income' : 'text-expense');
+            amountDiv.textContent = (income ? '+' : '−') + data.amount + ' ₽';
+
+            const typeDiv = document.createElement('div');
+            typeDiv.className = 'text-muted mt-1';
+            typeDiv.textContent = data.operation_type_display || '';
+
+            head.appendChild(amountDiv);
+            head.appendChild(typeDiv);
+            body.appendChild(head);
+
+            // Строки
+            appendDetailRow(body, 'Категория', category);
+            appendDetailRow(body, 'Дата и время', data.created_at || '—');
+            appendDetailRow(body, 'Способ оплаты', data.payment_method_display || '—');
+            appendDetailRow(body, 'Основание', data.reason || '—');
+            appendDetailRow(body, 'Комментарий', data.comment || '—');
+            appendDetailRow(body, 'Сотрудник', data.employee || '—');
+
+            if (data.order) {
+                appendDetailRow(body, 'Заказ', '#' + data.order);
+            }
+
+            appendDetailRow(body, 'Касса', data.cash_register || '—');
+        }
+
+        function appendDetailRow(parent, label, value) {
+            const row = document.createElement('div');
+            row.className = 'detail-row';
+
+            const labelDiv = document.createElement('div');
+            labelDiv.className = 'detail-label';
+            labelDiv.textContent = label;
+
+            const valueDiv = document.createElement('div');
+            valueDiv.className = 'detail-value';
+            valueDiv.textContent = value == null ? '' : String(value);
+
+            row.appendChild(labelDiv);
+            row.appendChild(valueDiv);
+            parent.appendChild(row);
         }
     </script>
 {% endblock %}

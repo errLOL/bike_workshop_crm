@@ -628,6 +628,7 @@
                         <select name="payment_method" id="payment_method" class="form-select" required>
                             <option value="">Выберите способ...</option>
                             <option value="cash">Наличные</option>
+                            <option value="card">Картой</option>
                             <option value="transfer">Банковский перевод</option>
                         </select>
                     </div>
@@ -649,11 +650,10 @@
             </form>
         </div>
     </div>
+<script>
 </div>
 {% endblock %}
 {% block extra_js %}
-<script>
-
 const uploadTrigger = document.getElementById('uploadTrigger');
 const photoInput = document.getElementById('photoInput');
 const previewArea = document.getElementById('previewArea');

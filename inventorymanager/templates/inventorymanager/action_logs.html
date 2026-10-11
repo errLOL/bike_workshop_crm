@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block title %}Журнал действий{% endblock %}
-
+{% load log_extras %}
 {% block extra_css %}
 <style>
     .filter-bar {
@@ -142,7 +142,7 @@
                                                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                                 </div>
                                                 <div class="modal-body">
-                                                    <pre class="small mb-0">{{ log.changes|pprint }}</pre>
+                                                    <pre class="small mb-0">{{ log.changes|pretty_changes }}</pre>
                                                 </div>
                                                 <div class="modal-footer">
                                                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>

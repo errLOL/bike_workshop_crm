@@ -24,11 +24,10 @@ import json
 
 from .utils import get_period_range, get_services_total, \
     calculate_formset_totals, get_technician_orders_with_salary, get_services_total_after_discount, \
-    get_completed_orders_count
+    get_completed_orders_count, build_changes, get_client_ip
 
 
 def log_action(request, action_type, model_name, object_id, object_repr, changes=None):
-    """Простая функция для логирования действий"""
     ActionLog.objects.create(
         user=request.user if request.user.is_authenticated else None,
         action_type=action_type,
@@ -38,14 +37,6 @@ def log_action(request, action_type, model_name, object_id, object_repr, changes
         ip_address=get_client_ip(request),
         changes=changes or {}
     )
-
-def get_client_ip(request):
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    if x_forwarded_for:
-        ip = x_forwarded_for.split(',')[0]
-    else:
-        ip = request.META.get('REMOTE_ADDR')
-    return ip
 
 
 @require_admin
@@ -1482,12 +1473,26 @@ def edit_order(request, order_id):
         Q(is_superuser=True) | Q(groups__name='Technician') & Q(is_active = True)
     ).distinct().order_by('first_name', 'username')
     if request.method == 'POST':
-        print(order.status == 'issued')
-        print(is_admin(User))
         if order.status == 'issued' and not is_admin(request.user):
             messages.error(request,f'Ошибка доступа')
             return redirect('order_detail', order_id=order.id)
-
+        old_data = {
+            'customer': order.customer.name,
+            'transport': order.transport.name,
+            'employee': order.employee.get_full_name(),
+            'status': order.status,
+            'description': order.description,
+            'service_discount': str(order.service_discount),
+            'parts_discount': str(order.parts_discount),
+            'order_items': {
+                item.product_id: {
+                    'quantity': item.quantity,
+                    'unit_price': str(item.unit_price),
+                    'product_name': item.product.name,
+                }
+                for item in order.order_items.select_related('product').all()
+            },
+        }
         old_items = {}
         if order.status in ('in_work', 'ready'):
             old_items = {
@@ -1592,13 +1597,32 @@ def edit_order(request, order_id):
                                 )
 
                             product.save()
-
+                    order.refresh_from_db()
+                    new_data = {
+                        'customer': order.customer.name,
+                        'transport': order.transport.name,
+                        'employee': order.employee.get_full_name(),
+                        'status': order.status,
+                        'description': order.description,
+                        'service_discount': str(order.service_discount),
+                        'parts_discount': str(order.parts_discount),
+                        'order_items': {
+                            item.product_id: {
+                                'quantity': item.quantity,
+                                'unit_price': str(item.unit_price),
+                                'product_name': item.product.name,
+                            }
+                            for item in order.order_items.select_related('product').all()
+                        },
+                    }
+                    changes = build_changes(old_data, new_data)
                     log_action(
                         request,
                         'edit',
                         'Order',
                         order.id,
-                        f"Заказ #{order.id}"
+                        f"Заказ #{order.id}",
+                        changes=changes
                     )
                     messages.success(
                         request,
@@ -1649,7 +1673,7 @@ def cancel_order_update(request, order):
             'Order',
             order.id,
             f"Заказ #{order.id}",
-            {'old_status': order.status, 'new_status': "cancelled"}
+            {'old_status': order.get_status_display(), 'new_status': "Отменен"}
         )
         order.status = "cancelled"
         order.save()
@@ -1704,16 +1728,17 @@ def change_order_status(request, order_id):
             return redirect('order_detail', order_id=order.id)
         order.completed_at = timezone.now()
 
+    old_status = order.get_status_display()
+    order.status = status
+    order.save()
     log_action(
             request,
             'status_change',
             'Order',
             order.id,
             f"Заказ #{order.id}",
-            {'old_status': order.status, 'new_status': status}
+            {'old_status': old_status, 'new_status': order.get_status_display()}
         )
-    order.status = status
-    order.save()
     messages.success(request, f'Заказ #{order.id} отмечен как "{order.get_status_display()}"')
     return redirect('order_detail', order_id=order.id)
 
@@ -2080,10 +2105,6 @@ def cash_register_list(request):
         and chart_end == today
     ):
         period_filter = 'quarter'
-
-    # =========================================================
-    # 8. Данные для основного графика
-    # =========================================================
 
     chart_transactions = (
         CashTransaction.objects
@@ -2559,10 +2580,6 @@ def cash_transaction_create(request):
 
 @require_http_methods(["GET", "POST"])
 def cash_transaction_edit(request, pk):
-    """
-    Редактирование кассовой операции через AJAX.
-    """
-
     cash_register = CashRegister.objects.filter(
         is_active=True
     ).first()
@@ -2576,78 +2593,81 @@ def cash_transaction_edit(request, pk):
             status=400
         )
 
-    transaction = get_object_or_404(
+    transaction_obj = get_object_or_404(
         CashTransaction,
         pk=pk,
         cash_register=cash_register
     )
 
     if request.method == 'GET':
-
         return JsonResponse({
             'success': True,
-
-            'id': transaction.id,
-
-            'operation_type': transaction.operation_type,
-
+            'id': transaction_obj.id,
+            'operation_type': transaction_obj.operation_type,
             'category_id': (
-                transaction.category_id
-                if transaction.category_id
+                transaction_obj.category_id
+                if transaction_obj.category_id
                 else None
             ),
-
-            'amount': str(transaction.amount),
-
-            'payment_method': transaction.payment_method,
-
-            'reason': transaction.reason or '',
-
-            'comment': transaction.comment or '',
-
+            'amount': str(transaction_obj.amount),
+            'payment_method': transaction_obj.payment_method,
+            'reason': transaction_obj.reason or '',
+            'comment': transaction_obj.comment or '',
             'order_id': (
-                transaction.order_id
-                if transaction.order_id
+                transaction_obj.order.id
+                if transaction_obj.order
                 else None
             ),
         })
-
+    old_data = {
+        'operation_type': transaction_obj.operation_type,
+        'category': transaction_obj.category.name,
+        'amount': str(transaction_obj.amount),
+        'payment_method': transaction_obj.payment_method,
+        'reason': transaction_obj.reason or '',
+        'comment': transaction_obj.comment or '',
+        'order_id': transaction_obj.order_id,
+    }
     form = CashTransactionForm(
         request.POST,
-        instance=transaction
+        instance=transaction_obj
     )
 
-    # Кассу нельзя поменять через форму
     form.data = form.data.copy()
     form.data['cash_register'] = str(cash_register.id)
 
     if form.is_valid():
+        transaction_obj = form.save(commit=False)
+        transaction_obj.cash_register = cash_register
+        transaction_obj.save()
+        new_data = {
+            'operation_type': transaction_obj.operation_type,
+            'category': transaction_obj.category.name,
+            'amount': str(transaction_obj.amount),
+            'payment_method': transaction_obj.payment_method,
+            'reason': transaction_obj.reason or '',
+            'comment': transaction_obj.comment or '',
+            'order_id': transaction_obj.order_id,
+        }
 
-        transaction = form.save(commit=False)
-
-        transaction.cash_register = cash_register
-
-        # employee НЕ меняем.
-        # Это пользователь, который создал операцию.
-
-        transaction.save()
+        changes = build_changes(old_data, new_data)
 
         log_action(
             request,
-            'update',
+            'edit',
             'CashTransaction',
-            transaction.id,
+            transaction_obj.id,
             (
-                f"Изменена кассовая операция #{transaction.id}: "
-                f"{transaction.get_operation_type_display()} "
-                f"{transaction.amount}₽"
-            )
+                f"Кассовая операция #{transaction_obj.id}: "
+                f"{transaction_obj.get_operation_type_display()} "
+                f"{transaction_obj.amount}₽"
+            ),
+            changes=changes,
         )
-
         return JsonResponse({
             'success': True,
             'message': 'Кассовая операция изменена.',
-            'transaction_id': transaction.id,
+            'transaction_id': transaction_obj.id,
         })
 
     return JsonResponse(
