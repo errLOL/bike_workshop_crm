@@ -16,7 +16,8 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods, require_POST
 
-from inventory_system.settings import DOMAIN, BASE_DIR
+from inventory_system.settings import DOMAIN, BASE_DIR, COMPANY_NAME, COMPANY_INN, COMPANY_OGRNIP, COMPANY_ADDRESS, \
+    COMPANY_PHONE, COMPANY_EMAIL, COMPANY_FULLNAME
 from .decorators import require_order_access, require_admin, is_admin
 from .forms import *
 from django.db.models import Sum, F, Q, Count, Avg, ExpressionWrapper, DecimalField
@@ -1354,12 +1355,18 @@ def product_detail(request, product_id):
 
 @login_required
 def order_detail(request, order_id):
-    order = get_object_or_404(Order, pk=order_id)
-    return render(
-        request,
-        "inventorymanager/order_detail.html",
-        {"order": order},
+    order = (
+        Order.objects
+        .select_related('customer', 'transport', 'employee')
+        .prefetch_related(
+            'order_items__product',
+            'payments__employee',
+            'transport__images__uploaded_by',
+            'notes__author',
+        )
+        .get(pk=order_id)
     )
+    return render(request, 'inventorymanager/order_detail.html', {'order': order})
 
 
 @login_required
@@ -1656,92 +1663,187 @@ def edit_order(request, order_id):
 
 @login_required
 @require_order_access
+@require_POST
 def cancel_order_update(request, order):
 
-    if request.method == "GET":
-        if order.status == "issued":
-            messages.warning(request, f'Невозможно отменить заказ со статусом {order.get_status_display()}')
-            return redirect("orders")
+    if order.status == "issued":
+        return JsonResponse(
+            {
+                "success": False,
+                "error": f'Невозможно отменить заказ со статусом "{order.get_status_display()}".',
+                "status": order.status,
+                "status_display": order.get_status_display(),
+            },
+            status=409,
+        )
+    if order.status == "cancelled":
+        return JsonResponse(
+            {
+                "success": True,
+                "message": f'Заказ #{order.id} уже отменён.',
+                "status": order.status,
+                "status_display": order.get_status_display(),
+            },
+            status=200,
+        )
+    old_status_display = order.get_status_display()
+    old_status = order.status
 
-        for order_item in order.order_items.all():
-            # Restoring current quantity in stock
-            order_item.product.quantity_in_stock -= order_item.quantity
-            order_item.product.save()
+    with transaction.atomic():
+        # Возврат запчастей — только если они были списаны (in_work/ready)
+        if old_status in ("in_work", "ready"):
+            for item in order.order_items.select_related("product"):
+                if item.product.product_type == "part":
+                    # select_for_update защитит от гонок
+                    prod = type(item.product).objects.select_for_update().get(pk=item.product.pk)
+                    prod.quantity_in_stock += item.quantity
+                    prod.save(update_fields=["quantity_in_stock"])
+
+        order.status = "cancelled"
+        order.completed_at = timezone.now()
+        order.save(update_fields=["status", "completed_at"])
+
         log_action(
             request,
-            'status_change',
-            'Order',
+            "status_change",
+            "Order",
             order.id,
             f"Заказ #{order.id}",
-            {'old_status': order.get_status_display(), 'new_status': "Отменен"}
+            {"old_status": old_status_display, "new_status": "Отменён"},
         )
-        order.status = "cancelled"
-        order.save()
-        messages.success(request, f'Заказ #{order.id} отменён, запчасти возвращены на склад')
-    return redirect("orders")
+    return JsonResponse(
+            {
+                "success": True,
+                "message": f'Заказ #{order.id} отменён, запчасти возвращены на склад.',
+                "status": order.status,
+                "status_display": order.get_status_display(),
+            },
+            status=200,
+        )
 
 
 @login_required
 # @require_order_access
+@require_http_methods(["GET", "POST"])
 def change_order_status(request, order_id):
     order = get_object_or_404(Order, pk=order_id)
-    status = request.GET.get('status')
+    if request.method == "POST":
+        try:
+            payload = json.loads(request.body or "{}")
+        except json.JSONDecodeError:
+            payload = {}
+        new_status = payload.get("status") or request.POST.get("status")
+        source = "ajax"
+    else:
+        new_status = request.GET.get("status")
+        source = "ajax" if request.headers.get("x-requested-with") == "XMLHttpRequest" else "redirect"
+
+    def fail(msg, details=None, code=400):
+        if source == "ajax":
+            return JsonResponse(
+                {"success": False, "error": msg, "details": details or []},
+                status=code,
+            )
+        messages.error(request, msg)
+        if details:
+            for d in details:
+                messages.error(request, d)
+        return redirect("order_detail", order_id=order.id)
+
+    def ok(msg):
+        if source == "ajax":
+            return JsonResponse(
+                {
+                    "success": True,
+                    "message": msg,
+                    "status": order.status,
+                    "status_display": order.get_status_display(),
+                }
+            )
+        messages.success(request, msg)
+        return redirect("order_detail", order_id=order.id)
+
     valid_statuses = [choice[0] for choice in Order.STATUS_CHOICES]
+    if new_status not in valid_statuses or order.status == new_status:
+        return fail("Недопустимый статус заказа.", code=400)
 
-    if status not in valid_statuses or order.status == status:
-        messages.error(request, f"Недопустимый статус заказа.")
-        return redirect('order_detail', order_id=order.id)
-    if order.status not in ("in_work", "ready") and status == "issued":
-        messages.error(request, 'Переведите заказ в статус "Готов".')
-        return redirect('order_detail', order_id=order.id)
+    if order.status not in ("in_work", "ready") and new_status == "issued":
+        return fail('Переведите заказ в статус "Готов".', code=409)
 
-    if status in ('in_work', 'ready')  and order.status in ('accepted', 'waiting_spareparts'):
+    if new_status in ("in_work", "ready") and order.status in ("accepted", "waiting_spareparts"):
         with transaction.atomic():
             missing_parts = []
             for item in order.order_items.all():
-                if item.product.product_type == 'part':
+                if item.product.product_type == "part":
                     if item.product.quantity_in_stock >= item.quantity:
                         item.product.quantity_in_stock -= item.quantity
-                        item.product.save()
+                        item.product.save(update_fields=["quantity_in_stock"])
                     else:
-                        missing_parts.append({
-                            'name': item.product.name,
-                            'available': item.product.quantity_in_stock,
-                            'required': item.quantity
-                        })
+                        missing_parts.append(
+                            {
+                                "name": item.product.name,
+                                "available": item.product.quantity_in_stock,
+                                "required": item.quantity,
+                            }
+                        )
 
             if missing_parts:
-                for part in missing_parts:
-                    messages.error(request, f'Недостаточно "{part["name"]}" на складе. Доступно: {part["available"]}, требуется: {part["required"]}')
-                return redirect('order_detail', order_id=order.id)
+                details = [
+                    f'Недостаточно "{p["name"]}" на складе. '
+                    f'Доступно: {p["available"]}, требуется: {p["required"]}'
+                    for p in missing_parts
+                ]
+                transaction.set_rollback(True)
+                return fail(
+                    "Недостаточно запчастей на складе.",
+                    details=details,
+                    code=409,
+                )
 
-    if order.status in ('in_work', 'ready') and status in ('accepted', 'waiting_spareparts'):
-        for item in order.order_items.all():
-            if item.product.product_type == 'part':
-                item.product.quantity_in_stock += item.quantity
-                item.product.save()
-        messages.info(request, 'Запчасти возвращены на склад')
+    if order.status in ("in_work", "ready") and new_status in ("accepted", "waiting_spareparts"):
+        with transaction.atomic():
+            for item in order.order_items.all():
+                if item.product.product_type == "part":
+                    item.product.quantity_in_stock += item.quantity
+                    item.product.save(update_fields=["quantity_in_stock"])
 
-    if order.status != 'issued' and status == 'issued':
+    # --- Завершение заказа (issued): проверка долга ---
+    if order.status != "issued" and new_status == "issued":
         if order.debt > 0:
-            messages.error(request, f"Ошибка! Не закрытый долг до заказу. Сумма {order.debt}")
-            return redirect('order_detail', order_id=order.id)
+            return fail(
+                f"Ошибка! Незакрытый долг по заказу: {order.debt:.2f} ₽.",
+                code=409,
+            )
         order.completed_at = timezone.now()
 
-    old_status = order.get_status_display()
-    order.status = status
+    # --- Сохранение статуса ---
+    old_status_display = order.get_status_display()
+    order.status = new_status
     order.save()
-    log_action(
-            request,
-            'status_change',
-            'Order',
-            order.id,
-            f"Заказ #{order.id}",
-            {'old_status': old_status, 'new_status': order.get_status_display()}
-        )
-    messages.success(request, f'Заказ #{order.id} отмечен как "{order.get_status_display()}"')
-    return redirect('order_detail', order_id=order.id)
 
+    log_action(
+        request,
+        "status_change",
+        "Order",
+        order.id,
+        f"Заказ #{order.id}",
+        {
+            "old_status": old_status_display,
+            "new_status": order.get_status_display(),
+        },
+    )
+
+    return ok(f'Заказ #{order.id} отмечен как "{order.get_status_display()}"')
+
+@require_POST
+def order_add_note(request, order_id):
+    order = get_object_or_404(Order, pk=order_id)
+    payload = json.loads(request.body)
+    text = (payload.get('text') or '').strip()
+    if not text:
+        return JsonResponse({'success': False, 'error': 'Пустая заметка'}, status=400)
+    note = OrderNote.objects.create(order=order, author=request.user, text=text)
+    return JsonResponse({'success': True, 'id': note.id})
 
 @login_required
 @require_admin
@@ -2850,7 +2952,6 @@ def order_add_payment(request, order_id):
             return JsonResponse({'success': False, 'error': 'Выберите способ оплаты'})
 
         cash_category = CashCategory.objects.filter(sort_order=0, category_type="income").first()
-        print(cash_category)
         payment = order.add_payment(cash_category, amount, payment_method, request.user, comment)
         log_action(
             request,
@@ -2893,6 +2994,7 @@ def order_print(request, order_id):
     order = get_object_or_404(Order.objects.select_related('customer', 'transport', 'employee'), id=order_id)
 
     context = {
+        'show_signatures': request.GET.get('signatures', '1') == "1",
         'order': order,
         'company_name': 'Spica Bike',
         'company_address': 'г. Казань, ул. Максимова, д. 20',
@@ -2901,3 +3003,22 @@ def order_print(request, order_id):
         'current_date': timezone.now(),
     }
     return render(request, 'inventorymanager/order_print.html', context)
+
+
+@login_required
+def akt_print(request, order_id):
+    order = get_object_or_404(Order.objects.select_related('customer', 'transport', 'employee'), id=order_id)
+    context = {
+        'order': order,
+        'show_bank_requisites': request.GET.get('bankRequisites') == "1",
+        'show_signatures': request.GET.get('signatures', '1') == "1",
+        'company_fullname': COMPANY_FULLNAME,
+        'company_name': COMPANY_NAME,
+        'company_inn': COMPANY_INN,
+        'company_ogrnip': COMPANY_OGRNIP,
+        'company_address': COMPANY_ADDRESS,
+        'company_phone': COMPANY_PHONE,
+        'company_email': COMPANY_EMAIL,
+        'current_date': timezone.now(),
+    }
+    return render(request, 'inventorymanager/akt_print.html', context)

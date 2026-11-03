@@ -35,10 +35,19 @@ class Category(models.Model):
             verbose_name_plural = "Categories"
 
 class Customer(BaseModel):
-    name = models.CharField(max_length=75, null = False)
-    telegram = models.CharField(max_length=75, blank=True, null=True)
-    phone = models.CharField(max_length=15)
+    is_company = models.BooleanField(default=False, verbose_name="Юр. лицо")
+    name = models.CharField(max_length=75, null = False, verbose_name='Имя')
+    telegram = models.CharField(max_length=75, blank=True, null=True,)
+    phone = models.CharField(max_length=15, verbose_name='Телефон')
+    company_name = models.CharField(max_length=255, blank=True, verbose_name='Название компании')
+    inn = models.CharField(max_length=12, blank=True, verbose_name='ИНН')
+    kpp = models.CharField(max_length=9, blank=True, verbose_name='КПП')
+    legal_address = models.CharField(max_length=255, blank=True, verbose_name='Адрес')
+    representative_name = models.CharField(max_length=255, blank=True, verbose_name='Имя представителя')
+    representative_position = models.CharField(max_length=255, blank=True, verbose_name='Должность представителя')
+    representative_basis = models.CharField(max_length=255, blank=True, verbose_name="На основании")
 
+    @property
     def formatted_phone(self):
         if not self.phone or len(self.phone) != 11:
             return self.phone
@@ -151,7 +160,16 @@ class Order(BaseModel):
         decimal_places=2,
         default=Decimal("0.00")
     )
+    deadline = models.DateTimeField(null=True, blank=True, verbose_name='Дедлайн')
     completed_at = models.DateTimeField(null=True, blank=True, verbose_name='Дата завершения')
+
+    @property
+    def is_overdue(self):
+        if not self.deadline:
+            return False
+        if self.status in ('issued', 'cancelled'):
+            return False
+        return timezone.now() > self.deadline
 
     @property
     def services_total(self):
@@ -260,6 +278,14 @@ class Order(BaseModel):
         transport_info = f" - {self.transport.name}" if self.transport else ""
         return f"Заказ #{self.id} от {self.created_at.strftime('%d.%m.%Y')}{transport_info}"
 
+class OrderNote(models.Model):
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='notes')
+    author = models.ForeignKey(get_user_model(), on_delete=models.SET_NULL, null=True)
+    text = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
 
 class TransportImage(BaseModel):
     transport = models.ForeignKey(

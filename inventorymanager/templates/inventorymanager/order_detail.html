@@ -1,379 +1,1078 @@
 {% extends "inventorymanager/layout.html" %}
 {% load crispy_forms_tags %}
+{% load static %}
 {% block title %}Заказ №{{ order.id }} - Мастерская{% endblock %}
-
 {% block extra_css %}
 <style>
+    :root {
+        --surface: #ffffff;
+        --surface-2: #f7f8fa;
+        --surface-3: #eef0f4;
+        --border: #e6e8ec;
+        --text: #1f2430;
+        --text-muted: #6b7280;
+        --primary: #4f6bed;
+        --primary-soft: #eef1fe;
+        --success: #16a34a;
+        --success-soft: #e8f7ee;
+        --warning: #d97706;
+        --warning-soft: #fef5e6;
+        --danger: #dc2626;
+        --danger-soft: #fdecec;
+        --radius: 14px;
+        --shadow-sm: 0 1px 3px rgba(16, 24, 40, .04);
+        --shadow-md: 0 4px 16px rgba(16, 24, 40, .06);
+    }
+
+    body { background: var(--surface-2); color: var(--text); }
+
+    /* ===== Sticky Header ===== */
+    .order-hero {
+        position: sticky;
+        top: 0;
+        z-index: 1020;
+        background: rgba(255, 255, 255, .92);
+        backdrop-filter: saturate(180%) blur(12px);
+        -webkit-backdrop-filter: saturate(180%) blur(12px);
+        border-bottom: 1px solid var(--border);
+        padding: .75rem 1.5rem;
+        margin: -1rem -1.5rem 1.5rem;
+    }
+    .order-hero-inner {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+    .hero-back {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 38px; height: 38px;
+        border-radius: 10px;
+        background: var(--surface-3);
+        color: var(--text);
+        text-decoration: none;
+        transition: background .15s ease;
+        flex-shrink: 0;
+    }
+    .hero-back:hover { background: var(--border); color: var(--text); }
+    .hero-title { display: flex; flex-direction: column; line-height: 1.15; }
+    .hero-title .num { font-size: 1.15rem; font-weight: 700; }
+    .hero-title .sub { font-size: .8rem; color: var(--text-muted); }
+    .hero-metrics {
+        display: flex;
+        gap: 1.5rem;
+        margin-left: auto;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    .hero-metric { display: flex; flex-direction: column; line-height: 1.1; }
+    .hero-metric .label { font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); font-weight: 600; }
+    .hero-metric .value { font-size: 1rem; font-weight: 700; }
+    .hero-metric .value.danger { color: var(--danger); }
+    .hero-metric .value.success { color: var(--success); }
+    .hero-actions { display: flex; gap: .5rem; align-items: center; }
+
+    /* ===== Cards ===== */
     .detail-card {
-        border-radius: 16px;
-        border: none;
-        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-        margin-bottom: 1.5rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-sm);
+        margin-bottom: 1.25rem;
         overflow: hidden;
     }
     .detail-card .card-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border: none;
-        padding: 1rem 1.5rem;
+        background: transparent;
+        border-bottom: 1px solid var(--border);
+        padding: .9rem 1.25rem;
         font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: .6rem;
+        color: var(--text);
     }
-    .status-badge {
-        padding: 0.4rem 1rem;
-        border-radius: 30px;
-        font-size: 0.8rem;
-        font-weight: 600;
+    .card-header .icon-wrap {
+        width: 30px; height: 30px;
+        border-radius: 9px;
+        display: inline-flex; align-items: center; justify-content: center;
+        background: var(--primary-soft);
+        color: var(--primary);
+        font-size: .85rem;
     }
+    .card-header .icon-wrap.green { background: var(--success-soft); color: var(--success); }
+    .card-header .icon-wrap.orange { background: var(--warning-soft); color: var(--warning); }
+    .card-header .icon-wrap.red { background: var(--danger-soft); color: var(--danger); }
+
+    /* ===== Info rows ===== */
     .info-row {
         display: flex;
-        padding: 0.75rem;
-        border-bottom: 1px solid #f0f0f0;
+        padding: .65rem 0;
+        border-bottom: 1px dashed var(--border);
     }
-    .info-label {
-        width: 140px;
+    .info-row:last-child { border-bottom: 0; }
+    .info-label { width: 140px; font-weight: 500; color: var(--text-muted); font-size: .88rem; flex-shrink: 0; }
+    .info-value { flex: 1; color: var(--text); font-size: .92rem; word-break: break-word; }
+    .info-value a { color: var(--primary); text-decoration: none; }
+    .info-value a:hover { text-decoration: underline; }
+
+    /* ===== Status badges ===== */
+    .status-badge {
+        display: inline-flex; align-items: center; gap: .35rem;
+        padding: .35rem .85rem;
+        border-radius: 30px;
+        font-size: .78rem;
         font-weight: 600;
-        color: #6c757d;
+        line-height: 1;
     }
-    .info-value {
-        flex: 1;
-        color: #2c3e50;
-    }
-    .items-table {
-        margin-bottom: 0;
-    }
-    .items-table th {
-        background-color: #f8f9fa;
-        border-bottom: 2px solid #e9ecef;
-        font-weight: 600;
-        color: #495057;
-    }
-    .total-row {
-        background-color: #f8f9fa;
-        font-weight: 700;
-        font-size: 1.1rem;
-    }
-    .action-buttons {
+    .status-in_work { background: #e0f2fe; color: #0369a1; }
+    .status-waiting_spareparts { background: var(--warning-soft); color: var(--warning); }
+    .status-ready { background: var(--success-soft); color: var(--success); }
+    .status-accepted { background: var(--primary-soft); color: var(--primary); }
+    .status-cancelled { background: var(--danger-soft); color: var(--danger); }
+    .status-issued { background: var(--surface-3); color: var(--text-muted); }
+
+    /* ===== Stepper ===== */
+    .status-stepper {
         display: flex;
-        gap: 0.75rem;
-        justify-content: flex-end;
-        flex-wrap: wrap;
-    }
-    .payment-card {
-        background: #f8f9fa;
-        border-left: 4px solid #28a745;
-    }
-    @media print {
-        .no-print {
-            display: none;
-        }
-        .detail-card {
-            box-shadow: none;
-            border: 1px solid #ddd;
-        }
-        .action-buttons {
-            display: none;
-        }
-    }
-    .upload-area {
-        transition: all 0.2s ease;
-    }
-    .upload-area .border {
-        transition: all 0.2s ease;
-    }
-    .upload-area .border:hover {
-        background-color: #e9ecef !important;
-        transform: translateY(-2px);
-    }
-    .photo-item {
-        transition: transform 0.2s ease;
-    }
-    .photo-item:hover {
-        transform: scale(1.02);
-    }
-    .dropdown-toggle .badge {
-        font-size: 0.75rem;
-        padding: 0.25rem 0.5rem;
-    }
-
-    .btn-group .dropdown-toggle {
-        min-width: 180px;
-        text-align: left;
-    }
-
-    .dropdown-toggle::after {
-        float: right;
-        margin-top: 8px;
-    }
-
-    .loader-overlay {
+        align-items: flex-start;
+        justify-content: space-between;
         position: relative;
-        display: inline-block;
+        padding: .5rem 0 .25rem;
+        margin: 0;
+        list-style: none;
+        gap: .25rem;
     }
-
-    .loader-container {
+    .status-stepper::before {
+        content: "";
+        position: absolute;
+        top: 17px; left: 8%; right: 8%;
+        height: 3px;
+        background: var(--surface-3);
+        border-radius: 3px;
+        z-index: 0;
+    }
+    .status-stepper .progress-line {
+        position: absolute;
+        top: 17px; left: 8%;
+        height: 3px;
+        background: linear-gradient(90deg, var(--primary), var(--success));
+        border-radius: 3px;
+        z-index: 1;
+        transition: width .4s ease;
+    }
+    .step {
+        position: relative;
+        z-index: 2;
+        flex: 1;
         display: flex;
         flex-direction: column;
         align-items: center;
-        justify-content: center;
-        padding: 20px;
+        text-align: center;
+        gap: .35rem;
+    }
+    .step .dot {
+        width: 36px; height: 36px;
+        border-radius: 50%;
+        background: var(--surface);
+        border: 2px solid var(--border);
+        display: flex; align-items: center; justify-content: center;
+        color: var(--text-muted);
+        font-size: .8rem;
+        transition: all .25s ease;
+    }
+    .step.done .dot { background: var(--success); border-color: var(--success); color: #fff; }
+    .step.current .dot { background: var(--primary); border-color: var(--primary); color: #fff; box-shadow: 0 0 0 4px var(--primary-soft); }
+    .step.cancelled .dot { background: var(--danger); border-color: var(--danger); color: #fff; }
+    .step .label { font-size: .72rem; font-weight: 600; color: var(--text-muted); }
+    .step.done .label, .step.current .label { color: var(--text); }
+
+    /* ===== Items table ===== */
+    .items-table { margin-bottom: 0; }
+    .items-table th {
+        background: var(--surface-2);
+        border-bottom: 1px solid var(--border);
+        font-weight: 600;
+        color: var(--text-muted);
+        font-size: .78rem;
+        text-transform: uppercase;
+        letter-spacing: .03em;
+        padding: .7rem .9rem;
+        white-space: nowrap;
+    }
+    .items-table td { padding: .75rem .9rem; border-color: var(--border); vertical-align: middle; font-size: .9rem; }
+    .items-table tbody tr:hover { background: var(--surface-2); }
+    .total-row { background: var(--surface-2); }
+    .total-row td { font-weight: 700; }
+
+    /* ===== Action buttons ===== */
+    .action-buttons {
+        display: flex;
+        gap: .6rem;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+    }
+    .action-buttons .btn { border-radius: 10px; font-weight: 500; }
+
+    /* ===== Upload area ===== */
+    .upload-area .upload-drop {
+        text-align: center;
+        padding: 1.75rem 1rem;
+        border: 2px dashed var(--border);
+        border-radius: var(--radius);
+        background: var(--surface-2);
+        cursor: pointer;
+        transition: all .2s ease;
+    }
+    .upload-area .upload-drop:hover,
+    .upload-area .upload-drop.drag-over {
+        background: var(--primary-soft);
+        border-color: var(--primary);
+    }
+    .upload-area .upload-drop i { color: var(--primary); }
+    .preview-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+        gap: .5rem;
+        margin-top: .75rem;
+    }
+    .preview-item {
+        position: relative;
+        aspect-ratio: 1;
+        border-radius: 10px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+    }
+    .preview-item img { width: 100%; height: 100%; object-fit: cover; }
+    .preview-item .remove {
+        position: absolute; top: 4px; right: 4px;
+        width: 22px; height: 22px;
+        border-radius: 50%;
+        background: rgba(0,0,0,.65);
+        color: #fff;
+        border: 0;
+        font-size: .7rem;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer;
     }
 
-    .loader-container .spinner-border {
-        width: 3rem;
-        height: 3rem;
+    /* Gallery */
+    .gallery-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        gap: .5rem;
     }
+    .gallery-item {
+        position: relative;
+        aspect-ratio: 1;
+        border-radius: 10px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        cursor: pointer;
+        transition: transform .15s ease, box-shadow .15s ease;
+    }
+    .gallery-item:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+    .gallery-item img { width: 100%; height: 100%; object-fit: cover; }
+    .gallery-item .cap {
+        position: absolute; bottom: 0; left: 0; right: 0;
+        background: linear-gradient(transparent, rgba(0,0,0,.7));
+        color: #fff;
+        font-size: .65rem;
+        padding: 1rem .4rem .3rem;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    /* Payment card */
+    .payment-card .card-header { background: transparent; }
+    .payment-debt-badge {
+        font-size: .72rem; padding: .25rem .55rem; border-radius: 6px; font-weight: 600;
+    }
+
+    /* Notes */
+    .note-item {
+        padding: .75rem;
+        border-radius: 10px;
+        background: var(--surface-2);
+        margin-bottom: .5rem;
+        border-left: 3px solid var(--warning);
+    }
+    .note-item .meta { font-size: .72rem; color: var(--text-muted); margin-top: .25rem; }
+
+    /* Deadline */
+    .deadline-overdue { color: var(--danger); font-weight: 700; }
+
+    /* Accordion */
+    .detail-card .accordion-button {
+        padding: .9rem 1.25rem;
+        font-weight: 600;
+        background: transparent;
+        color: var(--text);
+        box-shadow: none;
+    }
+    .detail-card .accordion-button:not(.collapsed) {
+        background: var(--surface-2);
+        color: var(--text);
+    }
+    .detail-card .accordion-button:focus { box-shadow: none; border: 0; }
+    .detail-card .accordion-body { padding: .75rem 1.25rem; }
+
+    /* Toasts */
+    .toast-stack {
+        position: fixed;
+        top: 1rem; right: 1rem;
+        z-index: 1080;
+        display: flex; flex-direction: column; gap: .5rem;
+        max-width: 340px;
+    }
+    .toast-stack .toast { border-radius: 12px; box-shadow: var(--shadow-md); }
+
+    /* Gallery modal */
+    #galleryModal .modal-content { border-radius: var(--radius); overflow: hidden; }
+    #galleryModal .modal-body { padding: 0; background: #0b0d12; position: relative; }
+    #galleryModal .modal-body img { width: 100%; max-height: 75vh; object-fit: contain; display: block; }
+    #galleryModal .nav-btn {
+        position: absolute; top: 50%; transform: translateY(-50%);
+        width: 44px; height: 44px; border-radius: 50%;
+        background: rgba(255,255,255,.15); color: #fff; border: 0;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.1rem; cursor: pointer; backdrop-filter: blur(4px);
+    }
+    #galleryModal .nav-btn:hover { background: rgba(255,255,255,.3); }
+    #galleryModal .nav-prev { left: 1rem; }
+    #galleryModal .nav-next { right: 1rem; }
+    #galleryModal .counter {
+        position: absolute; bottom: 1rem; left: 50%; transform: translateX(-50%);
+        background: rgba(0,0,0,.6); color: #fff; padding: .25rem .75rem;
+        border-radius: 20px; font-size: .78rem;
+    }
+        /* ===== Details / Accordion ===== */
+    details.detail-card > summary {
+        list-style: none;
+        cursor: pointer;
+        padding: .9rem 1.25rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: .6rem;
+        color: var(--text);
+        border-bottom: 1px solid transparent;
+        transition: background .15s ease;
+        user-select: none;
+    }
+    details.detail-card > summary::-webkit-details-marker { display: none; }
+    details.detail-card > summary > .chevron {
+        margin-left: auto;
+        font-size: .75rem;
+        color: var(--text-muted);
+        transition: transform .2s ease;
+    }
+    details.detail-card[open] > summary > .chevron { transform: rotate(180deg); }
+    details.detail-card[open] > summary { border-bottom-color: var(--border); }
+    details.detail-card > summary:hover { background: var(--surface-2); }
+    details.detail-card > .details-body { padding: .75rem 1.25rem 1.25rem; }
+    .detail-card > .card-body { padding: 1rem 1.25rem; }
+
+    @media print {
+        .no-print { display: none !important; }
+        .order-hero { position: static; backdrop-filter: none; background: #fff; }
+        .detail-card { box-shadow: none; border: 1px solid #ddd; break-inside: avoid; }
+        body { background: #fff; }
+    }
+
+    @media (max-width: 768px) {
+        .hero-metrics { width: 100%; margin-left: 0; justify-content: space-between; gap: .75rem; }
+        .info-label { width: 110px; }
+        .status-stepper .label { font-size: .62rem; }
+        .step .dot { width: 30px; height: 30px; font-size: .7rem; }
+    }
+
+    /* ===== Modern refinement layer ===== */
+    :root {
+        --surface:#fff; --surface-2:#f5f7fb; --surface-3:#edf1f7; --border:#e5eaf2;
+        --text:#182230; --text-muted:#718096; --primary:#4968e8; --primary-soft:#edf1ff;
+        --success:#159b68; --success-soft:#e8f7f0; --warning:#c78318; --warning-soft:#fff5df;
+        --danger:#d94b58; --danger-soft:#fff0f1; --radius:16px;
+        --shadow-sm:0 2px 8px rgba(24,34,48,.045); --shadow-md:0 12px 30px rgba(24,34,48,.09);
+    }
+    body { background:radial-gradient(ellipse at 8% 0%,rgba(73,104,232,.055),transparent 32rem),var(--surface-2); color:var(--text); -webkit-font-smoothing:antialiased; }
+    .container-fluid[style*="max-width"] { padding-left:clamp(1rem,2.2vw,2rem); padding-right:clamp(1rem,2.2vw,2rem); }
+    .order-hero { top:0; padding:.85rem clamp(1rem,2vw,1.5rem); margin-bottom:1.35rem; border-color:rgba(225,231,241,.9); box-shadow:0 5px 20px rgba(24,34,48,.035); }
+    .hero-back { width:42px; height:42px; border:1px solid var(--border); background:#fff; box-shadow:var(--shadow-sm); }
+    .hero-back:hover { background:var(--primary-soft); color:var(--primary); border-color:#dce3ff; }
+    .hero-title .num { font-size:1.25rem; letter-spacing:-.035em; }
+    .hero-title .sub { margin-top:.22rem; font-size:.78rem; }
+    .hero-metrics { gap:clamp(.8rem,1.7vw,1.65rem); }
+    .hero-metric .label { font-size:.64rem; letter-spacing:.07em; }
+    .hero-metric .value { margin-top:.22rem; font-size:.98rem; font-variant-numeric:tabular-nums; }
+    .hero-actions .btn { min-height:40px; border-radius:11px; }
+    .detail-card { border-radius:16px; border-color:#e7ebf2; box-shadow:0 2px 10px rgba(24,34,48,.035); margin-bottom:1rem; transition:box-shadow .18s ease,transform .18s ease; }
+    .detail-card:hover { box-shadow:0 8px 24px rgba(24,34,48,.065); }
+    .detail-card .card-header { padding:.9rem 1.1rem; font-size:.91rem; letter-spacing:-.01em; }
+    .detail-card .card-body { padding:1rem 1.1rem; }
+    .card-header .icon-wrap { width:34px; height:34px; border-radius:11px; font-size:.9rem; }
+    .info-row { gap:.75rem; padding:.72rem 0; }
+    .info-label { width:118px; font-size:.81rem; }
+    .info-value { font-size:.88rem; line-height:1.5; }
+    .info-value a { font-weight:600; }
+    .status-badge { padding:.48rem .8rem; font-size:.74rem; letter-spacing:.01em; }
+    .status-stepper { padding:.4rem 0 .2rem; }
+    .status-stepper::before,.status-stepper .progress-line { top:18px; height:3px; }
+    .step .dot { width:38px; height:38px; box-shadow:0 0 0 4px #fff; }
+    .step .label { font-size:.68rem; line-height:1.3; }
+    .items-table { min-width:650px; }
+    .items-table th { padding:.85rem .9rem; font-size:.68rem; }
+    .items-table td { padding:.9rem; }
+    .items-table tbody tr { transition:background .15s ease; }
+    .items-table tbody tr:hover { background:#f7f9ff; }
+    .items-table .form-check-input { cursor:pointer; }
+    .total-row td { background:#f7f8fc; }
+    .total-row:last-child td { border-top:1px solid var(--border); }
+    .action-buttons { position:sticky; bottom:12px; z-index:20; padding:.65rem; border:1px solid rgba(225,231,241,.9); border-radius:15px; background:rgba(255,255,255,.92); backdrop-filter:blur(12px); box-shadow:0 8px 28px rgba(24,34,48,.10); }
+    .action-buttons .btn { min-height:40px; padding-left:1rem; padding-right:1rem; }
+    .upload-area .upload-drop { border-radius:14px; padding:1.5rem 1rem; background:linear-gradient(135deg,#f7f9ff,#fbfcff); }
+    .upload-area .upload-drop:focus-visible,.gallery-item:focus-visible { outline:3px solid rgba(73,104,232,.35); outline-offset:3px; }
+    .preview-item,.gallery-item { border-radius:12px; }
+    .gallery-item { background:var(--surface-3); }
+    .gallery-item:hover { transform:translateY(-3px); }
+    .payment-progress-wrap { padding:.85rem .9rem; margin:.85rem 0 .35rem; border-radius:12px; background:#f7f9fc; border:1px solid var(--border); }
+    .payment-progress { height:8px; border-radius:20px; background:#e7ecf4; overflow:hidden; }
+    .payment-progress .progress-bar { border-radius:20px; background:linear-gradient(90deg,#4968e8,#19a675); transition:width .35s ease; }
+    .note-item { padding:.85rem .9rem; border:1px solid var(--border); border-left:3px solid #e2a33b; background:#fffdf8; }
+    .note-item .meta { line-height:1.5; }
+    .modal-content { border:1px solid var(--border); border-radius:17px; box-shadow:0 18px 55px rgba(16,24,40,.18); }
+    .modal-header,.modal-footer { padding:1rem 1.25rem; }
+    .modal-body { padding:1.25rem; }
+    .form-control,.form-select,.input-group-text { border-color:#dfe5ee; border-radius:10px; min-height:40px; }
+    .form-control:focus,.form-select:focus { border-color:#9aabff; box-shadow:0 0 0 .2rem rgba(73,104,232,.12); }
+    .btn { font-weight:600; letter-spacing:-.01em; }
+    .btn-primary { background:#4968e8; border-color:#4968e8; }
+    .btn-primary:hover { background:#3856d2; border-color:#3856d2; }
+    @media (max-width:991.98px) {
+        .order-hero { position:relative; margin-left:-1rem; margin-right:-1rem; }
+        .hero-metrics { order:3; }
+        .hero-actions { margin-left:auto; }
+        .action-buttons { position:static; }
+    }
+    @media (max-width:767.98px) {
+        .container-fluid[style*="max-width"] { padding-top:.75rem!important; }
+        .order-hero { padding:.75rem 1rem; }
+        .order-hero-inner { gap:.7rem; }
+        .hero-title { min-width:0; flex:1; }
+        .hero-title .num { font-size:1.08rem; }
+        .hero-title .sub { max-width:65vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .hero-metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.75rem; padding:.75rem; border-radius:12px; background:#f7f9fc; width:100%; }
+        .hero-actions { width:100%; margin:0; }
+        .hero-actions>.btn-group:first-child { flex:1; }
+        .hero-actions>.btn-group:first-child>.btn { width:100%; }
+        .info-label { width:105px; }
+        .status-stepper { gap:0; }
+        .step .dot { width:31px; height:31px; font-size:.68rem; }
+        .status-stepper::before,.status-stepper .progress-line { top:15px; }
+        .step .label { font-size:.58rem; }
+        .action-buttons { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+        .action-buttons>.btn,.action-buttons>.btn-group { width:100%; }
+        .action-buttons .btn-group>.btn { width:100%; }
+        .detail-card .card-header { padding:.8rem .95rem; }
+        .detail-card .card-body { padding:.9rem .95rem; }
+    }
+    @media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important; transition-duration:.01ms!important; animation-duration:.01ms!important; } }
+
 </style>
+
 {% endblock %}
-{% block body %}
-<div class="messages">
-    {% if messages %}
-        {% for message in messages %}
-            <!-- Error Messages -->
-            {% if message.level == DEFAULT_MESSAGE_LEVELS.ERROR %}
-                <div class="alert alert-danger alert-dismissible fade show mt-2" role="alert">
-                    <strong>{{ message }}</strong>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+
+{{% block body %}
+<div class="toast-stack" id="toastStack"></div>
+
+<div class="container-fluid py-4" style="max-width: 1400px;">
+
+    <!-- ===== Sticky Hero ===== -->
+    <div class="order-hero no-print">
+        <div class="order-hero-inner">
+            <a href="{% url 'orders' %}" class="hero-back" title="Назад к списку">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+            <div class="hero-title">
+                <span class="num">Заказ #{{ order.id }}</span>
+                <span class="sub">
+                    {{ order.customer.name|default:"—" }}
+                    {% if order.transport.name %} · {{ order.transport.name }}{% endif %}
+                    · {{ order.created_at|date:"d.m.Y H:i" }}
+                </span>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <span class="status-badge status-{{ order.status }}" id="heroStatusBadge">
+                    {% if order.status == 'in_work' %}<i class="fas fa-screwdriver-wrench"></i> В работе
+                    {% elif order.status == 'waiting_spareparts' %}<i class="fas fa-hourglass-half"></i> Ожидает запчасти
+                    {% elif order.status == 'ready' %}<i class="fas fa-check-circle"></i> Готов
+                    {% elif order.status == 'accepted' %}<i class="fas fa-inbox"></i> Новый
+                    {% elif order.status == 'cancelled' %}<i class="fas fa-times-circle"></i> Отменён
+                    {% else %}<i class="fas fa-box"></i> Выдан
+                    {% endif %}
+                </span>
+            </div>
+
+            <div class="hero-metrics">
+                <div class="hero-metric">
+                    <span class="label">Сумма</span>
+                    <span class="value">{{ order.total|floatformat:2 }} ₽</span>
                 </div>
-            <!-- Success Messages -->
-            {% elif message.level == DEFAULT_MESSAGE_LEVELS.SUCCESS %}
-                <div class="alert alert-success alert-dismissible fade show mt-2" role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                <div class="hero-metric">
+                    <span class="label">Оплачено</span>
+                    <span class="value success">{{ order.total_paid|floatformat:2 }} ₽</span>
                 </div>
-            {% endif %}
-        {% endfor %}
-    {% endif %}
-</div>
-<div class="container-fluid py-4">
-    <nav aria-label="breadcrumb" class="mb-4 no-print">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{% url 'orders' %}">Заказы</a></li>
-            <li class="breadcrumb-item active" aria-current="page">Заказ №{{ order.id }}</li>
-        </ol>
-    </nav>
+                <div class="hero-metric">
+                    <span class="label">Долг</span>
+                    <span class="value {% if order.debt > 0 %}danger{% else %}success{% endif %}">
+                        {{ order.debt|floatformat:2 }} ₽
+                    </span>
+                </div>
+                {% if order.deadline %}
+                <div class="hero-metric">
+                    <span class="label">Дедлайн</span>
+                    <span class="value {% if order.is_overdue %}deadline-overdue{% endif %}">
+                        {{ order.deadline|date:"d.m.Y" }}
+                        {% if order.is_overdue %}<i class="fas fa-exclamation-triangle ms-1"></i>{% endif %}
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="hero-actions">
+                <!-- Print dropdown -->
+                <div class="btn-group">
+                    <button type="button" class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="fas fa-print me-1"></i>Печать
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                        <li><h6 class="dropdown-header">Документы</h6></li>
+                        <li>
+                            <a class="dropdown-item" target="_blank" href="{% url 'akt_print' order.id %}">
+                                <i class="fas fa-file-signature me-2 text-primary"></i>Акт выполненных работ
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item" target="_blank" href="{% url 'order_print' order.id %}">
+                                <i class="fas fa-file-invoice me-2 text-primary"></i>Заказ-наряд
+                            </a>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><h6 class="dropdown-header">Дополнительно</h6></li>
+                        <li>
+                            <a class="dropdown-item" target="_blank" href="{% url 'order_print_label' order.id %}">
+                                <i class="fas fa-tag me-2 text-dark"></i>Этикетка с QR
+                            </a>
+                        </li>
+                        <li>
+                            <button class="dropdown-item" type="button" onclick="openPrintOptions()">
+                                <i class="fas fa-cog me-2 text-secondary"></i>Параметры печати…
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Kebab menu -->
+                <div class="btn-group">
+                    <button type="button" class="btn btn-outline-secondary dropdown-toggle px-2"
+                            data-bs-toggle="dropdown" aria-expanded="false" title="Действия">
+                        <i class="fas fa-ellipsis-vertical"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                        <li><h6 class="dropdown-header">Действия с заказом</h6></li>
+                        <li>
+                            <button class="dropdown-item" type="button" onclick="copyLink()">
+                                <i class="fas fa-link me-2"></i>Скопировать ссылку
+                            </button>
+                        </li>
+                        <li>
+                            <button class="dropdown-item" type="button"
+                                    data-bs-toggle="modal" data-bs-target="#duplicateModal">
+                                <i class="fas fa-copy me-2"></i>Дублировать заказ
+                            </button>
+                        </li>
+                        <li>
+                            <button class="dropdown-item" type="button"
+                                    data-bs-toggle="modal" data-bs-target="#notifyModal">
+                                <i class="fab fa-telegram me-2 text-info"></i>Отправить наряд в Telegram
+                            </button>
+                        </li>
+                        <li>
+                            <button class="dropdown-item" type="button"
+                                    data-bs-toggle="modal" data-bs-target="#notifyModal">
+                                <img width="15.8px" height="15.8px" class="mr-1"
+                                     style="margin-right: 5px;"
+                                     src="{% static 'inventorymanager/img/max_colored.svg' %}">
+                                Отправить наряд в MAX
+                            </button>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <button class="dropdown-item" type="button" onclick="showToast('Функция в разработке','info')">
+                                <i class="fas fa-archive me-2"></i>Архивировать
+                            </button>
+                        </li>
+                        <li>
+                            <button class="dropdown-item text-danger" type="button" onclick="cancelOrder()">
+                                <i class="fas fa-trash me-2"></i>Удалить заказ
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="row">
-        <!-- Левая колонка - информация о заказе -->
-        <div class="col-lg-4">
+        <!-- ===== LEFT COLUMN ===== -->
+        <div class="col-lg-8">
             <div class="detail-card">
                 <div class="card-header">
-                    <i class="fas fa-info-circle me-2"></i>Информация о заказе
+                    <span class="icon-wrap"><i class="fas fa-list"></i></span>
+                    Позиции заказа
+                    <span class="badge bg-secondary ms-2" id="itemsCount">{{ order.order_items.all|length }}</span>
                 </div>
-                <div class="card-body">
-                    <div class="info-row">
-                        <div class="info-label">Номер заказа:</div>
-                        <div class="info-value"><strong>#{{ order.id }}</strong></div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table items-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width:36px;"></th>
+                                    <th>№</th>
+                                    <th>Наименование</th>
+                                    <th>Тип</th>
+                                    <th>Кол-во</th>
+                                    <th>Цена</th>
+                                    <th class="text-end">Сумма</th>
+                                </tr>
+                            </thead>
+                            <tbody id="itemsBody">
+                                {% for item in order.order_items.all %}
+                                <tr data-item-id="{{ item.id }}">
+                                    <td>
+                                        <input type="checkbox" class="form-check-input item-checkbox" data-id="{{ item.id }}">
+                                    </td>
+                                    <td>{{ forloop.counter }}</td>
+                                    <td><strong>{{ item.product.name }}</strong></td>
+                                    <td>
+                                        {% if item.product.product_type == 'part' %}
+                                            <span class="badge bg-primary bg-opacity-10 text-primary">Запчасть</span>
+                                        {% else %}
+                                            <span class="badge bg-success bg-opacity-10 text-success">Услуга</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ item.quantity }}</td>
+                                    <td>{{ item.unit_price|floatformat:2 }} ₽</td>
+                                    <td class="text-end fw-bold">{{ item.subtotal|floatformat:2 }} ₽</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="7" class="text-center py-5 text-muted">
+                                        <i class="fas fa-box-open fa-2x mb-2 d-block opacity-50"></i>
+                                        <div>Нет позиций в заказе</div>
+                                        {% if order.status != 'issued' %}
+                                        <a href="{% url 'edit_order' order.id %}" class="btn btn-sm btn-primary mt-3">
+                                            <i class="fas fa-plus me-1"></i>Добавить позицию
+                                        </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr class="total-row">
+                                    <td colspan="6" class="text-end fw-normal">Скидка:</td>
+                                    <td class="text-end">-{{ order.total_discount|default:0|floatformat:2 }} ₽</td>
+                                </tr>
+                                <tr class="total-row">
+                                    <td colspan="6" class="text-end">Итого:</td>
+                                    <td class="text-end text-primary fs-5">{{ order.total|floatformat:2 }} ₽</td>
+                                </tr>
+                            </tfoot>
+                        </table>
                     </div>
-                    <div class="info-row">
-                        <div class="info-label">Дата создания:</div>
-                        <div class="info-value">{{ order.created_at|date:"d.m.Y H:i" }}</div>
-                    </div>
-                    {% if order.status == 'issued' %}
-                    <div class="info-row">
-                        <div class="info-label">Дата завершения:</div>
-                        <div class="info-value">{{ order.completed_at|date:"d.m.Y H:i" }}</div>
-                    </div>
-                    {% endif %}
-                    <div class="info-row">
-                        <div class="info-label">Статус:</div>
-                        <div class="info-value">
-                            {% if order.status == 'in_work' %}
-                                <span class="status-badge bg-info ">🔄 В работе</span>
-                            {% elif order.status == 'waiting_spareparts' %}
-                                <span class="status-badge bg-warning">⏳ Ожидает запчасти</span>
-                            {% elif order.status == 'ready' %}
-                                <span class="status-badge bg-success text-white">✅ Готов</span>
-                            {% elif order.status == 'accepted' %}
-                                <span class="status-badge bg-primary text-white">🆕 Новый</span>
-                            {% elif order.status == 'cancelled' %}
-                                <span class="status-badge bg-danger text-white">Отменен</span>
-                            {% else %}
-                                <span class="status-badge bg-secondary">📁 Выдан</span>
-                            {% endif %}
+
+                    <div class="d-flex justify-content-between align-items-center p-3 border-top no-print"
+                         id="bulkBar" style="display:none !important;">
+                        <span class="small text-muted">
+                            Выбрано: <strong id="selectedCount">0</strong>
+                        </span>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-outline-danger" onclick="bulkDelete()">
+                                <i class="fas fa-trash me-1"></i>Удалить
+                            </button>
                         </div>
-                    </div>
-                    <div class="info-row">
-                        <div class="info-label">Сотрудник:</div>
-                        <div class="info-value">{{ order.employee.get_full_name|default:order.employee.username|default:"—" }}</div>
                     </div>
                 </div>
             </div>
 
-            <!-- Информация о клиенте -->
+            {% if order.description %}
             <div class="detail-card">
                 <div class="card-header">
-                    <i class="fas fa-user me-2"></i>Клиент
+                    <span class="icon-wrap"><i class="fas fa-clipboard-list"></i></span>
+                    Описание проблемы
                 </div>
                 <div class="card-body">
+                    {{ order.description|linebreaks }}
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="action-buttons mt-3 mb-4 no-print">
+                <a href="{% url 'orders' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-1"></i>Назад
+                </a>
+                {% if order.status != 'issued' %}
+                <a href="{% url 'edit_order' order.id %}" class="btn btn-outline-primary">
+                    <i class="fas fa-edit me-1"></i>Редактировать
+                </a>
+                {% endif %}
+
+                {% if order.status == 'accepted' or order.status == 'waiting_spareparts' %}
+                <button type="button" class="btn btn-warning text-white" onclick="changeStatus('in_work')">
+                    <i class="fas fa-screwdriver-wrench me-1"></i>В работу
+                </button>
+                {% elif order.status == 'in_work' %}
+                <button type="button" class="btn btn-success" onclick="changeStatus('ready')">
+                    <i class="fas fa-check me-1"></i>Готов
+                </button>
+                {% elif order.status == 'ready' %}
+                <button type="button" class="btn btn-primary" onclick="confirmIssue()">
+                    <i class="fas fa-box me-1"></i>Завершить
+                </button>
+                {% endif %}
+
+                {% if order.status != 'issued' %}
+                <div class="btn-group">
+                    <button type="button" class="btn btn-outline-secondary dropdown-toggle"
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="fas fa-chevron-down me-1"></i>Все статусы
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li>
+                            <button class="dropdown-item {% if order.status == 'accepted' %}disabled{% endif %}"
+                                    onclick="changeStatus('accepted')">
+                                <i class="fas fa-inbox me-2"></i>Принят
+                            </button>
+                        </li>
+                        <li>
+                            <button class="dropdown-item {% if order.status == 'in_work' %}disabled{% endif %}"
+                                    onclick="changeStatus('in_work')">
+                                <i class="fas fa-tools me-2"></i>В работу
+                            </button>
+                        </li>
+                        <li>
+                            <button class="dropdown-item {% if order.status == 'waiting_spareparts' %}disabled{% endif %}"
+                                    onclick="changeStatus('waiting_spareparts')">
+                                <i class="fas fa-clock me-2"></i>Ожидает запчасти
+                            </button>
+                        </li>
+                        <li>
+                            <button class="dropdown-item {% if order.status == 'ready' %}disabled{% endif %}"
+                                    onclick="changeStatus('ready')">
+                                <i class="fas fa-check-circle me-2"></i>Готов
+                            </button>
+                        </li>
+                        <li>
+                            <button class="dropdown-item {% if order.status == 'issued' %}disabled{% endif %}"
+                                    onclick="confirmIssue()">
+                                <i class="fas fa-hand-peace me-2"></i>Выдан
+                            </button>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <button class="dropdown-item text-danger" type="button" onclick="cancelOrder()">
+                                <i class="fas fa-times-circle me-2"></i>Отменить заказ
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+
+        <!-- ===== RIGHT COLUMN ===== -->
+        <div class="col-lg-4">
+
+            <!-- Info card with stepper (всегда открыт) -->
+            <div class="detail-card">
+                <div class="card-header">
+                    <span class="icon-wrap"><i class="fas fa-info-circle"></i></span>
+                    Информация о заказе
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        {% with st=order.status %}
+                        <ul class="status-stepper">
+                            <div class="progress-line" style="width: {% if st == 'accepted' %}0{% elif st == 'in_work' %}22{% elif st == 'waiting_spareparts' %}22{% elif st == 'ready' %}66{% elif st == 'issued' %}88{% else %}0{% endif %}%;"></div>
+                            <li class="step {% if st == 'accepted' %}current{% elif st == 'in_work' or st == 'waiting_spareparts' or st == 'ready' or st == 'issued' %}done{% endif %}">
+                                <span class="dot"><i class="fas fa-inbox"></i></span>
+                                <span class="label">Принят</span>
+                            </li>
+                            <li class="step {% if st == 'in_work' %}current{% elif st == 'waiting_spareparts' or st == 'ready' or st == 'issued' %}done{% endif %}">
+                                <span class="dot"><i class="fas fa-tools"></i></span>
+                                <span class="label">В работе</span>
+                            </li>
+                            <li class="step {% if st == 'waiting_spareparts' %}current{% elif st == 'ready' or st == 'issued' %}done{% endif %}">
+                                <span class="dot"><i class="fas fa-clock"></i></span>
+                                <span class="label">Ждём</span>
+                            </li>
+                            <li class="step {% if st == 'ready' %}current{% elif st == 'issued' %}done{% endif %}">
+                                <span class="dot"><i class="fas fa-check"></i></span>
+                                <span class="label">Готов</span>
+                            </li>
+                            <li class="step {% if st == 'issued' %}current{% elif st == 'cancelled' %}cancelled{% endif %}">
+                                <span class="dot"><i class="fas fa-box"></i></span>
+                                <span class="label">Выдан</span>
+                            </li>
+                        </ul>
+                        {% endwith %}
+                    </div>
+
                     <div class="info-row">
-                        <div class="info-label">Имя:</div>
+                        <div class="info-label">Номер заказа</div>
+                        <div class="info-value">
+                            <strong>#{{ order.id }}</strong>
+                            <button class="btn btn-sm btn-link p-0 ms-2" onclick="copyText('{{ order.id }}')" title="Скопировать">
+                                <i class="fas fa-copy text-muted"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Дата создания</div>
+                        <div class="info-value">{{ order.created_at|date:"d.m.Y H:i" }}</div>
+                    </div>
+                    {% if order.status == 'issued' %}
+                    <div class="info-row">
+                        <div class="info-label">Дата завершения</div>
+                        <div class="info-value">{{ order.completed_at|date:"d.m.Y H:i"|default:"—" }}</div>
+                    </div>
+                    {% endif %}
+                    <div class="info-row">
+                        <div class="info-label">Дедлайн</div>
+                        <div class="info-value">
+                            {% if order.deadline %}
+                                <span class="{% if order.is_overdue %}deadline-overdue{% endif %}">
+                                    {{ order.deadline|date:"d.m.Y H:i" }}
+                                    {% if order.is_overdue %}<span class="badge bg-danger ms-1">просрочен</span>{% endif %}
+                                </span>
+                            {% else %}
+                                <span class="text-muted">не задан</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Сотрудник</div>
+                        <div class="info-value">{{ order.employee.get_full_name|default:order.employee.username|default:"—" }}</div>
+                    </div>
+                </div>
+            </div>
+            <!-- Notes (details) -->
+            <details class="detail-card" data-persist="notes">
+                <summary>
+                    <span class="icon-wrap orange"><i class="fas fa-sticky-note"></i></span>
+                    Внутренние заметки
+                    <i class="fas fa-chevron-down chevron"></i>
+                </summary>
+                <div class="details-body">
+                    <div id="notesList">
+                        {% with notes=order.notes.all %}
+                        {% if notes %}
+                            {% for note in notes %}
+                            <div class="note-item" data-note-id="{{ note.id }}">
+                                <div>{{ note.text }}</div>
+                                <div class="meta">
+                                    <i class="fas fa-user me-1"></i>{{ note.author.get_full_name|default:note.author.username|default:"—" }}
+                                    · <i class="fas fa-clock me-1"></i>{{ note.created_at|date:"d.m.Y H:i" }}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="text-muted small text-center py-2" id="noNotes">
+                                <i class="fas fa-comment-slash me-1"></i>Пока нет заметок
+                            </div>
+                        {% endif %}
+                        {% endwith %}
+                    </div>
+                    <div class="d-flex gap-2 mt-2">
+                        <input type="text" id="newNoteInput" class="form-control form-control-sm"
+                               placeholder="Например: клиент просил перезвонить в 18:00…">
+                        <button type="button" class="btn btn-sm btn-primary" onclick="addNote()">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+            </details>
+            <!-- Client (details, открыт по умолчанию) -->
+            <details class="detail-card" data-persist="client" open>
+                <summary>
+                    <span class="icon-wrap"><i class="fas fa-user"></i></span>
+                    Клиент
+                    <i class="fas fa-chevron-down chevron"></i>
+                </summary>
+                <div class="details-body">
+                    <div class="info-row">
+                        <div class="info-label">Имя</div>
                         <div class="info-value">
                             <a href="{% url 'customer_detail' order.customer.id %}"><strong>{{ order.customer.name|default:"—" }}</strong></a>
                         </div>
                     </div>
                     {% if order.customer.phone %}
                     <div class="info-row">
-                        <div class="info-label">Телефон:</div>
-                        <div class="info-value">
-                            <a href="tel:{{ order.customer.phone }}">+{{ order.customer.phone }}</a>
+                        <div class="info-label">Телефон</div>
+                        <div class="info-value d-flex align-items-center gap-2 flex-wrap">
+                            <a href="tel:+{{ order.customer.phone }}">+{{ order.customer.formatted_phone }}</a>
+                            <button class="btn btn-sm btn-link p-0" onclick="copyText('+{{ order.customer.phone }}')" title="Скопировать">
+                                <i class="fas fa-copy text-muted"></i>
+                            </button>
+                            <a class="btn btn-sm btn-outline-success py-0 px-2" href="tel:{{ order.customer.phone }}">
+                                <i class="fas fa-phone"></i>
+                            </a>
                         </div>
                     </div>
                     {% endif %}
                     {% if order.customer.telegram %}
                     <div class="info-row">
-                        <div class="info-label">Telegram:</div>
+                        <div class="info-label">Telegram</div>
                         <div class="info-value">{{ order.customer.telegram }}</div>
                     </div>
                     {% endif %}
-                </div>
-            </div>
-
-            <!-- Информация о технике -->
-            <div class="detail-card">
-                <div class="card-header">
-                    <i class="fas fa-bicycle me-2"></i>Техника
-                </div>
-                <div class="card-body">
+                    {% if order.customer.telegram %}
                     <div class="info-row">
-                        <div class="info-label">Название:</div>
+                        <div class="info-label">Max</div>
+                        <div class="info-value">{{ order.customer.max }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </details>
+
+            <!-- Transport (details) -->
+            <details class="detail-card" data-persist="transport" open>
+                <summary>
+                    <span class="icon-wrap"><i class="fas fa-bicycle"></i></span>
+                    Техника
+                    <i class="fas fa-chevron-down chevron"></i>
+                </summary>
+                <div class="details-body">
+                    <div class="info-row">
+                        <div class="info-label">Название</div>
                         <div class="info-value">
                             <a href="{% url 'transport_detail' order.transport.id %}"><strong>{{ order.transport.name|default:"—" }}</strong></a>
                         </div>
                     </div>
                     {% if order.transport.transport_type %}
                     <div class="info-row">
-                        <div class="info-label">Тип:</div>
+                        <div class="info-label">Тип</div>
                         <div class="info-value">{{ order.transport.get_transport_type_display }}</div>
                     </div>
                     {% endif %}
                     {% if order.transport.serial_number %}
                     <div class="info-row">
-                        <div class="info-label">Серийный номер:</div>
-                        <div class="info-value"><code>{{ order.transport.serial_number }}</code></div>
+                        <div class="info-label">Серийный №</div>
+                        <div class="info-value">
+                            <code>{{ order.transport.serial_number }}</code>
+                            <button class="btn btn-sm btn-link p-0 ms-2" onclick="copyText('{{ order.transport.serial_number }}')" title="Скопировать">
+                                <i class="fas fa-copy text-muted"></i>
+                            </button>
+                        </div>
                     </div>
                     {% endif %}
                     {% if order.transport.color %}
                     <div class="info-row">
-                        <div class="info-label">Цвет:</div>
+                        <div class="info-label">Цвет</div>
                         <div class="info-value">{{ order.transport.color }}</div>
                     </div>
                     {% endif %}
                     {% if order.transport.comment %}
                     <div class="info-row">
-                        <div class="info-label">Комментарий:</div>
+                        <div class="info-label">Комментарий</div>
                         <div class="info-value">{{ order.transport.comment }}</div>
                     </div>
                     {% endif %}
                 </div>
-            </div>
-            <!-- Блок фото транспорта -->
-            <div class="detail-card">
-            <div class="card-header">
-                <i class="fas fa-camera me-2"></i>Фото транспорта
-            </div>
-            <div class="card-body">
-                <div class="upload-area mb-4" id="uploadArea">
-                    <input type="file" id="photoInput" accept="image/*" style="display: none;">
-                    <div class="text-center p-4 border rounded-3 bg-light" style="cursor: pointer; transition: all 0.2s;" id="uploadTrigger">
-                        <i class="fas fa-camera fa-3x text-primary mb-2"></i>
-                        <div class="fw-bold">Сделать фото или загрузить</div>
-                        <div class="small text-muted mt-1">Нажмите, чтобы открыть камеру или выбрать из галереи</div>
-                    </div>
-                    <div id="previewArea" class="mt-3" style="display: none;">
-                        <div class="d-flex align-items-center gap-3 p-3 bg-light rounded">
-                            <img id="imagePreview" src="#" alt="Preview" style="width: 80px; height: 80px; object-fit: cover; border-radius: 12px;">
-                            <div class="flex-grow-1">
-                                <div class="fw-bold" id="previewFileName"></div>
-                                <div class="small text-muted mt-1">Фото будет добавлено после сохранения</div>
+            </details>
+
+            <!-- Photos (details) -->
+            <details class="detail-card" data-persist="photos" open>
+                <summary>
+                    <span class="icon-wrap"><i class="fas fa-camera"></i></span>
+                    Фото транспорта
+                    <i class="fas fa-chevron-down chevron"></i>
+                </summary>
+                <div class="details-body">
+                    <div class="upload-area mb-3" id="uploadArea">
+                        <input type="file" id="photoInput" accept="image/*" multiple style="display: none;">
+                        <div class="upload-drop" id="uploadTrigger">
+                            <i class="fas fa-camera fa-2x mb-2 d-block"></i>
+                            <div class="fw-bold">Сделать фото или загрузить</div>
+                            <div class="small text-muted mt-1">Клик, перетащите файлы или вставьте из буфера (Ctrl+V)</div>
+                        </div>
+                        <div class="preview-grid" id="previewGrid"></div>
+                        <textarea name="photo_description" id="photoDescription" class="form-control mt-2" rows="1" placeholder="Описание (например: повреждение рамы, серийный номер…)" style="display: none;"></textarea>
+                        <button type="button" id="confirmUploadBtn" class="btn btn-primary mt-2 w-100" style="display: none;">
+                            <i class="fas fa-check me-1"></i>Загрузить <span id="pendingCount">0</span>
+                        </button>
+                        <div id="uploadLoader" style="display: none;" class="text-center py-3">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Загрузка…</span>
                             </div>
-                            <button type="button" class="btn btn-sm btn-outline-danger" id="cancelPreviewBtn">
-                                <i class="fas fa-times"></i>
-                            </button>
+                            <div class="mt-2 text-muted small">Загрузка фото…</div>
                         </div>
                     </div>
-                    <input type="hidden" name="pending_photo" id="pendingPhoto" value="">
-                    <textarea name="photo_description" id="photoDescription" class="form-control mt-2" rows="1" placeholder="Описание (что видно на фото, например: повреждение рамы, серийный номер...)" style="display: none;"></textarea>
-                    <button type="button" id="confirmUploadBtn" class="btn btn-primary mt-2 w-100" style="display: none;">
-                        <i class="fas fa-check me-1"></i>Добавить фото
-                    </button>
-                    <div id="uploadLoader" style="display: none;" class="text-center py-3">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Загрузка...</span>
-                    </div>
-                    <div class="mt-2 text-muted small">Загрузка фото...</div>
-                </div>
-                </div>
 
-                <!-- Галерея фото -->
-                {% with order.transport.images.all as images %}
-                {% if images %}
-                <div class="mt-3">
+                    {% with images=order.transport.images.all %}
+                    {% if images %}
                     <div class="text-muted small mb-2">
                         <i class="fas fa-images me-1"></i>Все фото ({{ images|length }})
                     </div>
-                    <div class="row g-2">
+                    <div class="gallery-grid" id="galleryGrid">
                         {% for img in images %}
-                        <div class="col-4 col-md-3">
-                            <div class="position-relative photo-item">
-                                <img src="{{ img.image.url }}" alt="{{ img.description|default:'Фото' }}"
-                                     class="img-fluid rounded w-100" style="height: 100px; object-fit: cover; cursor: pointer;"
-                                     onclick="showImageModal('{{ img.image.url }}', '{{ img.description|default:'' }}', '{{ img.created_at|date:'d.m.Y H:i' }}', '{{ img.uploaded_by.get_full_name|default:img.uploaded_by.username }}')">
-                                {% if img.description %}
-                                <div class="small text-muted mt-1 text-truncate">{{ img.description }}</div>
-                                {% endif %}
-                            </div>
+                        <div class="gallery-item"
+                             data-src="{{ img.image.url }}"
+                             data-description="{{ img.description|default:'' }}"
+                             data-meta="{{ img.created_at|date:'d.m.Y H:i' }} · {{ img.uploaded_by.get_full_name|default:img.uploaded_by.username|default:'—' }}"
+                             data-index="{{ forloop.counter0 }}"
+                             onclick="openGallery({{ forloop.counter0 }})">
+                            <img src="{{ img.image.url }}" alt="{{ img.description|default:'Фото' }}" loading="lazy">
+                            {% if img.description %}<div class="cap">{{ img.description }}</div>{% endif %}
                         </div>
                         {% endfor %}
                     </div>
-                </div>
-                {% else %}
-                <div class="text-center py-4 text-muted">
-                    <i class="fas fa-camera fa-2x mb-2 d-block"></i>
-                    <div>Нет фото</div>
-                    <div class="small">Сделайте фото при приёме в ремонт</div>
-                </div>
-                {% endif %}
-                {% endwith %}
-            </div>
-            <div class="modal fade" id="imageModal" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog modal-dialog-centered">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">Фото транспорта</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body text-center">
-                            <img src="" id="modalImage" class="img-fluid" alt="Фото">
-                            <p id="modalDescription" class="mt-2 text-muted"></p>
-                            <p id="modalMeta" class="small text-muted"></p>
-                        </div>
+                    {% else %}
+                    <div class="text-center py-3 text-muted">
+                        <i class="fas fa-camera fa-2x mb-2 d-block opacity-50"></i>
+                        <div>Нет фото</div>
+                        <div class="small">Загрузите первое фото</div>
                     </div>
+                    {% endif %}
+                    {% endwith %}
                 </div>
-            </div>
-            </div>
-            <!-- Блок оплаты -->
+            </details>
+
+            <!-- Payment (всегда открыт) -->
             <div class="detail-card payment-card">
-                <div class="card-header" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">
-                    <i class="fas fa-credit-card me-2"></i>Оплата
+                <div class="card-header">
+                    <span class="icon-wrap green"><i class="fas fa-credit-card"></i></span>
+                    Оплата
                 </div>
                 <div class="card-body">
                     <div class="info-row">
-                        <div class="info-label">Сумма заказа:</div>
+                        <div class="info-label">Сумма заказа</div>
                         <div class="info-value"><strong>{{ order.total|floatformat:2 }} ₽</strong></div>
                     </div>
                     <div class="info-row">
-                        <div class="info-label">Оплачено:</div>
-                        <div class="info-value text-success">
-                            <strong>{{ order.total_paid|floatformat:2 }} ₽</strong>
-                        </div>
+                        <div class="info-label">Оплачено</div>
+                        <div class="info-value text-success"><strong>{{ order.total_paid|floatformat:2 }} ₽</strong></div>
                     </div>
                     <div class="info-row">
                         <div class="info-label">
-                            Долг:
+                            Долг
                             {% if order.debt > 0 %}
-                                <span class="badge bg-warning text-dark ms-1">Ожидает оплаты</span>
+                                <span class="payment-debt-badge bg-warning text-dark ms-1">ожидает</span>
                             {% else %}
-                                <span class="badge bg-success ms-1">Оплачено полностью</span>
+                                <span class="payment-debt-badge bg-success text-white ms-1">оплачено</span>
                             {% endif %}
                         </div>
                         <div class="info-value {% if order.debt > 0 %}text-danger fw-bold{% else %}text-success{% endif %}">
@@ -384,32 +1083,32 @@
                     {% if order.debt > 0 and order.status != 'issued' %}
                     <div class="mt-3">
                         <button type="button" class="btn btn-success w-100" data-bs-toggle="modal" data-bs-target="#paymentModal">
-                            <i class="fas fa-plus-circle me-1"></i>Внести платеж
+                            <i class="fas fa-plus-circle me-1"></i>Внести платёж
                         </button>
                     </div>
                     {% endif %}
 
-                    <!-- История оплат -->
-                    {% if order.payments.all %}
+                    {% with payments=order.payments.all %}
+                    {% if payments %}
                     <div class="mt-4">
-                        <div class="text-muted small mb-2">История оплат</div>
+                        <div class="text-muted small mb-2"><i class="fas fa-history me-1"></i>История оплат</div>
                         <div class="table-responsive">
-                            <table class="table table-sm table-borderless">
+                            <table class="table table-sm table-borderless mb-0">
                                 <thead>
                                     <tr>
-                                        <th>Дата</th>
-                                        <th>Сумма</th>
-                                        <th>Способ</th>
-                                        <th>Сотрудник</th>
+                                        <th class="small text-muted">Дата</th>
+                                        <th class="small text-muted">Сумма</th>
+                                        <th class="small text-muted">Способ</th>
+                                        <th class="small text-muted">Сотрудник</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for payment in order.payments.all %}
+                                    {% for payment in payments %}
                                     <tr>
                                         <td class="small">{{ payment.created_at|date:"d.m.Y H:i" }}</td>
                                         <td class="fw-bold text-success">{{ payment.amount|floatformat:2 }} ₽</td>
                                         <td class="small">{{ payment.get_payment_method_display }}</td>
-                                        <td class="small">{{ payment.employee.get_full_name|default:payment.employee.username }}</td>
+                                        <td class="small">{{ payment.employee.get_full_name|default:payment.employee.username|default:"—" }}</td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>
@@ -417,422 +1116,601 @@
                         </div>
                     </div>
                     {% endif %}
+                    {% endwith %}
                 </div>
             </div>
+
+
         </div>
+    </div>
+</div>
 
-        <!-- Правая колонка - позиции заказа -->
-        <div class="col-lg-8">
-            <div class="detail-card">
-                <div class="card-header">
-                    <i class="fas fa-list me-2"></i>Позиции заказа
+<!-- ===== MODALS ===== -->
+<div class="modal fade" id="galleryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header border-0 pb-0">
+                <div>
+                    <h6 class="modal-title mb-0" id="galleryTitle">Фото</h6>
+                    <div class="small text-muted" id="galleryMeta"></div>
                 </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table items-table mb-0">
-                            <thead>
-                                <tr>
-                                    <th>№</th>
-                                    <th>Наименование</th>
-                                    <th>Тип</th>
-                                    <th>Кол-во</th>
-                                    <th>Цена</th>
-                                    <th class="text-end">Сумма</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for item in order.order_items.all %}
-                                <tr>
-                                    <td>{{ forloop.counter }}</td>
-                                    <td>
-                                        <strong>{{ item.product.name }}</strong>
-                                    </td>
-                                    <td>
-                                        {% if item.product.product_type == 'part' %}
-                                            <span class="badge bg-primary">Запчасть</span>
-                                        {% else %}
-                                            <span class="badge bg-success">Услуга</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>{{ item.quantity }}</td>
-                                    <td>{{ item.unit_price|floatformat:2 }} ₽</td>
-                                    <td class="text-end fw-bold">{{ item.subtotal|floatformat:2 }} ₽</td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="6" class="text-center py-5 text-muted">
-                                        <i class="fas fa-box-open fa-2x mb-2 d-block"></i>
-                                        Нет позиций в заказе
-                                     </td>
-                                 </tr>
-                                {% endfor %}
-                            </tbody>
-                            <tfoot>
-                                <tr class="total-row">
-                                    <td colspan="5" class="text-end fs-6 fw-light">Скидка:</td>
-                                    <td class="text-end">
-                                        -{{ order.total_discount|floatformat:2|default:0 }} ₽
-                                     </td>
-                                 </tr>
-                                <tr class="table-active total-row">
-                                    <td colspan="5" class="text-end fw-bold">Итого:</td>
-                                    <td class="text-end fw-bold text-primary fs-4">
-                                        {{ order.total|floatformat:2 }} ₽
-                                     </td>
-                                 </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-
-            <!-- Дополнительная информация (если есть) -->
-            {% if order.description %}
-                <div class="detail-card">
-                    <div class="card-header">
-                        <i class="fas fa-clipboard-list me-2"></i>Описание проблемы
-                    </div>
-                    <div class="card-body">
-                        {{ order.description|linebreaks }}
-                    </div>
-                </div>
-                {% endif %}
-
-            <!-- Кнопки действий -->
-            <div class="action-buttons mt-3 no-print">
-                <a href="{% url 'orders' %}" class="btn btn-secondary">
-                    <i class="fas fa-arrow-left me-1"></i>Назад к списку
+            <div class="modal-body">
+                <button class="nav-btn nav-prev" onclick="galleryPrev()"><i class="fas fa-chevron-left"></i></button>
+                <img id="galleryImage" src="" alt="Фото">
+                <button class="nav-btn nav-next" onclick="galleryNext()"><i class="fas fa-chevron-right"></i></button>
+                <div class="counter" id="galleryCounter">1 / 1</div>
+            </div>
+            <div class="modal-footer border-0">
+                <div class="me-auto small text-muted" id="galleryDescription"></div>
+                <a class="btn btn-sm btn-outline-secondary" id="galleryDownload" download>
+                    <i class="fas fa-download me-1"></i>Скачать
                 </a>
-                <a href="{% url 'order_print' order.id %}" class="btn btn-info text-white" target="_blank">
-                    <i class="fas fa-print me-1"></i>Печать наряда
+                               <a class="btn btn-sm btn-outline-secondary" id="galleryDownload" download>
+                    <i class="fas fa-download me-1"></i>Скачать
                 </a>
-                <a href="{% url 'order_print_label' order.id %}" class="btn btn-dark" target="_blank">
-                    <i class="fas fa-tag me-1"></i>Этикетка с QR
-                </a>
-                {% if order.status != 'issued' %}
-                <a href="{% url 'edit_order' order.id %}" class="btn btn-warning text-white">
-                    <i class="fas fa-edit me-1"></i>Редактировать
-                </a>
-                {% endif %}
-                {% if order.debt > 0 and order.status != 'issued' %}
-                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#paymentModal">
-                    <i class="fa-solid fa-cash-register me-1"></i>Внести платеж
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteCurrentPhoto()">
+                    <i class="fas fa-trash me-1"></i>Удалить
                 </button>
-                {% endif %}
-                {% if order.status == 'accepted' or order.status == 'waiting_spareparts' %}
-                <button type="button" class="btn btn-warning"
-                        onclick="window.location.href='{% url 'change_order_status' order.id %}?status=in_work'">
-                    <i class="fa-solid fa-screwdriver-wrench me-1"></i>В работу
-                </button>
-                {% elif order.status == 'in_work' %}
-                <button type="button" class="btn btn-success"
-                        onclick="window.location.href='{% url 'change_order_status' order.id %}?status=ready'">
-                    <i class="fas fa-check me-1"></i>Готов
-                </button>
-                {% elif order.status == 'ready' %}
-                <button type="button" class="btn btn-primary"
-                        onclick="window.location.href='{% url 'change_order_status' order.id %}?status=issued'">
-                    <i class="fa-solid fa-box me-1"></i>Завершить
-                </button>
-                {% endif %}
-
-                <!-- Дополнительная кнопка с выпадашкой (все статусы) -->
-                {% if order.status != 'issued' %}
-                <div class="btn-group">
-                    <button type="button" class="btn btn-outline-secondary dropdown-toggle"
-                            data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="fas fa-chevron-down me-1"></i>Сменить статус
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <li>
-                            <a class="dropdown-item {% if order.status == 'accepted' %}disabled{% endif %}"
-                               href="{% url 'change_order_status' order.id %}?status=accepted">
-                                <i class="fas fa-inbox me-2"></i>Принят
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item {% if order.status == 'in_work' %}disabled{% endif %}"
-                               href="{% url 'change_order_status' order.id %}?status=in_work">
-                                <i class="fas fa-tools me-2"></i>В работу
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item {% if order.status == 'waiting_spareparts' %}disabled{% endif %}"
-                               href="{% url 'change_order_status' order.id %}?status=waiting_spareparts">
-                                <i class="fas fa-clock me-2"></i>Ожидает запчасти
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item {% if order.status == 'ready' %}disabled{% endif %}"
-                               href="{% url 'change_order_status' order.id %}?status=ready">
-                                <i class="fas fa-check-circle me-2"></i>Готов
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item {% if order.status == 'issued' %}disabled{% endif %}"
-                               href="{% url 'change_order_status' order.id %}?status=issued">
-                                <i class="fas fa-hand-peace me-2"></i>Выдан
-                            </a>
-                        </li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li>
-                            <a class="dropdown-item text-danger"
-                               href="{% url 'cancel_order_update' order.id %}"
-                               onclick="return confirm('Отменить заказ №{{ order.id }}? Запчасти будут возвращены на склад.')">
-                                <i class="fas fa-times-circle me-2"></i>Отменить заказ
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-                {% endif %}
             </div>
         </div>
     </div>
 </div>
 
-<!-- Модалка для добавления оплаты -->
-<div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
+<!-- Payment Modal -->
+<div class="modal fade" id="paymentModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="paymentModalLabel">
-                    <i class="fas fa-credit-card me-2 text-primary"></i>
-                    Принять оплату заказа #{{ order.id }}
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title"><i class="fas fa-credit-card me-2 text-primary"></i>Принять оплату #{{ order.id }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="post" id="paymentForm" action="{% url 'order_add_payment' order.id %}">
                 {% csrf_token %}
                 <div class="modal-body">
-                    <div class="alert alert-info d-flex justify-content-between mb-3">
-                        <span>Сумма заказа:</span>
-                        <strong>{{ order.total|floatformat:2 }} ₽</strong>
+                    <div class="alert alert-light d-flex justify-content-between mb-2">
+                        <span>Сумма заказа:</span><strong>{{ order.total|floatformat:2 }} ₽</strong>
                     </div>
                     <div class="alert alert-warning d-flex justify-content-between mb-3">
                         <span>Остаток к оплате:</span>
                         <strong class="text-danger" id="debtAmount">{{ order.debt|floatformat:2 }} ₽</strong>
                     </div>
-
                     <div class="mb-3">
-                        <label for="amount" class="form-label">Сумма оплаты <span class="text-danger">*</span></label>
+                        <label class="form-label">Сумма оплаты <span class="text-danger">*</span></label>
                         <div class="input-group">
                             <input type="number" name="amount" id="amount" class="form-control"
                                    step="0.01" min="0.01" max="{{ order.debt }}" required>
                             <span class="input-group-text">₽</span>
                         </div>
-                        <div class="form-text">Максимальная сумма: {{ order.debt|floatformat:2 }} ₽</div>
                     </div>
-
                     <div class="mb-3">
-                        <label for="payment_method" class="form-label">Способ оплаты <span class="text-danger">*</span></label>
+                        <label class="form-label">Способ оплаты <span class="text-danger">*</span></label>
                         <select name="payment_method" id="payment_method" class="form-select" required>
-                            <option value="">Выберите способ...</option>
+                            <option value="">Выберите…</option>
                             <option value="cash">Наличные</option>
                             <option value="card">Картой</option>
                             <option value="transfer">Банковский перевод</option>
                         </select>
                     </div>
-
-                    <div class="mb-3">
-                        <label for="comment" class="form-label">Комментарий</label>
-                        <input type="text" name="comment" id="comment" class="form-control"
-                               placeholder="Например: предоплата 50%">
+                    <div class="mb-0">
+                        <label class="form-label">Комментарий</label>
+                        <input type="text" name="comment" id="comment" class="form-control" placeholder="Например: предоплата 50%">
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                        <i class="fas fa-times me-1"></i>Отмена
-                    </button>
-                    <button type="submit" class="btn btn-success">
-                        <i class="fas fa-check me-1"></i>Внести платеж
-                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-success"><i class="fas fa-check me-1"></i>Внести</button>
                 </div>
             </form>
         </div>
     </div>
-<script>
+</div>
+
+<!-- Print options modal -->
+<div class="modal fade" id="printModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-cog me-2"></i>Параметры печати</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Документ</label>
+                    <select class="form-select" id="printDoc">
+                        <option value="{% url 'order_print' order.id %}">Заказ-наряд</option>
+                        <option value="{% url 'akt_print' order.id %}">Акт выполненных работ</option>
+                    </select>
+                </div>
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input print-opt" type="checkbox" id="optPrices" checked>
+                    <label class="form-check-label" for="optPrices">Показывать цены</label>
+                </div>
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input print-opt" type="checkbox" id="optBankRequisites">
+                    <label class="form-check-label" for="optBankRequisites">Показывать реквизиты</label>
+                </div>
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input print-opt" type="checkbox" id="optSignatures" checked>
+                    <label class="form-check-label" for="optSignatures">Показывать подписи</label>
+                </div>
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input print-opt" type="checkbox" id="optQR" checked>
+                    <label class="form-check-label" for="optQR">Показывать QR-код</label>
+                </div>
+                <div class="row g-2 mt-2">
+                    <div class="col-6">
+                        <label class="form-label small">Формат</label>
+                        <select class="form-select form-select-sm" id="optFormat">
+                            <option value="A4">A4</option>
+                            <option value="A5">A5</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small">Копий</label>
+                        <input type="number" class="form-control form-control-sm" id="optCopies" value="1" min="1" max="5">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button class="btn btn-primary" onclick="doPrint()"><i class="fas fa-print me-1"></i>Печать</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Duplicate Modal -->
+<div class="modal fade" id="duplicateModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-copy me-2"></i>Дублировать заказ</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3">Будет создан новый заказ с той же техникой и клиентом.</p>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="dupItems" checked>
+                    <label class="form-check-label" for="dupItems">Копировать позиции</label>
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="dupDescription" checked>
+                    <label class="form-check-label" for="dupDescription">Копировать описание</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button class="btn btn-primary" onclick="doDuplicate()">
+                    <i class="fas fa-copy me-1"></i>Дублировать
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Notify Modal -->
+<div class="modal fade" id="notifyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fab fa-telegram me-2 text-info"></i>Отправить клиенту</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted">Заказ #{{ order.id }} · {{ order.customer.name|default:"—" }}</p>
+                <div class="mb-3">
+                    <label class="form-label">Канал</label>
+                    <select class="form-select" id="notifyChannel">
+                        {% if order.customer.telegram %}<option value="telegram">Telegram</option>{% endif %}
+                        {% if order.customer.phone %}<option value="sms">SMS</option>{% endif %}
+                        <option value="copy">Скопировать текст</option>
+                    </select>
+                </div>
+                <div class="mb-0">
+                    <label class="form-label">Сообщение</label>
+                    <textarea class="form-control" id="notifyText" rows="4">Здравствуйте! По заказу #{{ order.id }} ({{ order.transport.name|default:"техника" }}) статус: {{ order.get_status_display|default:"в работе" }}. Сумма: {{ order.total|floatformat:2 }} ₽.</textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button class="btn btn-primary" onclick="doNotify()"><i class="fas fa-paper-plane me-1"></i>Отправить</button>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 {% block extra_js %}
-const uploadTrigger = document.getElementById('uploadTrigger');
-const photoInput = document.getElementById('photoInput');
-const previewArea = document.getElementById('previewArea');
-const imagePreview = document.getElementById('imagePreview');
-const previewFileName = document.getElementById('previewFileName');
-const cancelPreviewBtn = document.getElementById('cancelPreviewBtn');
-const confirmUploadBtn = document.getElementById('confirmUploadBtn');
-const photoDescription = document.getElementById('photoDescription');
-const pendingPhoto = document.getElementById('pendingPhoto');
+<script>
+/* ============ Utilities ============ */
+const CSRF = '{{ csrf_token }}';
+const ORDER_ID = {{ order.id }};
+const TRANSPORT_ID = {{ order.transport.id }};
+const UPLOAD_URL = "{% url 'upload_transport_photo' order.transport.id %}";
+const PAYMENT_URL = "{% url 'order_add_payment' order.id %}";
 
-let selectedFile = null;
+function showToast(message, type = 'success') {
+    const map = {
+        success: { cls: 'text-bg-success', icon: 'fa-check-circle' },
+        error:   { cls: 'text-bg-danger',  icon: 'fa-exclamation-circle' },
+        warning: { cls: 'text-bg-warning', icon: 'fa-exclamation-triangle' },
+        info:    { cls: 'text-bg-primary', icon: 'fa-info-circle' },
+    };
+    const cfg = map[type] || map.info;
+    const el = document.createElement('div');
+    el.className = `toast align-items-center border-0 ${cfg.cls}`;
+    el.setAttribute('role', 'alert');
+    el.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body d-flex align-items-center gap-2">
+                <i class="fas ${cfg.icon}"></i> ${message}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>`;
+    document.getElementById('toastStack').appendChild(el);
+    const t = new bootstrap.Toast(el, { delay: 3500 });
+    t.show();
+    el.addEventListener('hidden.bs.toast', () => el.remove());
+}
 
-// Клик по области загрузки
-uploadTrigger.addEventListener('click', function() {
-    photoInput.click();
-});
+function copyText(text) {
+    navigator.clipboard.writeText(text).then(
+        () => showToast('Скопировано: ' + text, 'success'),
+        () => showToast('Не удалось скопировать', 'error')
+    );
+}
+function copyLink() { copyText(window.location.href); }
 
-// Выбор файла
-photoInput.addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (file) {
-        selectedFile = file;
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            imagePreview.src = event.target.result;
-            previewFileName.textContent = file.name.length > 30 ? file.name.substring(0, 27) + '...' : file.name;
-            previewArea.style.display = 'block';
-            photoDescription.style.display = 'block';
-            confirmUploadBtn.style.display = 'block';
-            uploadTrigger.style.display = 'none';
-        };
-        reader.readAsDataURL(file);
-    }
-});
-
-// Отмена предпросмотра
-cancelPreviewBtn.addEventListener('click', function() {
-    resetUploadForm();
-});
-
-// Подтверждение загрузки
-confirmUploadBtn.addEventListener('click', function() {
-    if (!selectedFile) return;
-
-    // Показываем лоадер, скрываем кнопку
-    const loader = document.getElementById('uploadLoader');
-    const confirmBtn = document.getElementById('confirmUploadBtn');
-
-    loader.style.display = 'block';
-    confirmBtn.style.display = 'none';
-    confirmBtn.disabled = true;
-
-    // Добавляем небольшой анимационный эффект для текста
-    const loaderText = loader.querySelector('.text-muted');
-    let dots = 0;
-    const dotInterval = setInterval(() => {
-        dots = (dots + 1) % 4;
-        loaderText.textContent = 'Загрузка фото' + '.'.repeat(dots);
-    }, 300);
-
-    const formData = new FormData();
-    formData.append('image', selectedFile);
-    formData.append('description', photoDescription.value);
-    formData.append('order_id', '{{ order.id }}');
-    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
-
-    fetch("{% url 'upload_transport_photo' order.transport.id %}", {
-        method: 'POST',
-        body: formData,
-        headers: {
-            'X-Requested-With': 'XMLHttpRequest'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        clearInterval(dotInterval);
-        if (data.success) {
-            // Перезагружаем только галерею
-            location.reload();
-        } else {
-            alert(data.error || 'Ошибка при загрузке');
-            resetUploadForm();
-            // Скрываем лоадер и показываем кнопку
-            loader.style.display = 'none';
-            confirmBtn.style.display = 'block';
-            confirmBtn.disabled = false;
-        }
-    })
-    .catch(error => {
-        clearInterval(dotInterval);
-        console.error('Error:', error);
-        alert('Ошибка при загрузке фото');
-        resetUploadForm();
-        // Скрываем лоадер и показываем кнопку
-        loader.style.display = 'none';
-        confirmBtn.style.display = 'block';
-        confirmBtn.disabled = false;
+/* ============ Details persistence ============ */
+document.querySelectorAll('details[data-persist]').forEach(d => {
+    const key = 'order_detail_' + d.dataset.persist;
+    const saved = localStorage.getItem(key);
+    if (saved === 'closed') d.removeAttribute('open');
+    if (saved === 'open')    d.setAttribute('open', '');
+    d.addEventListener('toggle', () => {
+        localStorage.setItem(key, d.open ? 'open' : 'closed');
     });
 });
 
-function resetUploadForm() {
-    selectedFile = null;
-    photoInput.value = '';
-    previewArea.style.display = 'none';
-    photoDescription.style.display = 'none';
-    confirmUploadBtn.style.display = 'block';
-    confirmUploadBtn.disabled = false;
-    uploadTrigger.style.display = 'block';
-    photoDescription.value = '';
-    pendingPhoto.value = '';
+/* ============ Multi-upload ============ */
+const uploadTrigger = document.getElementById('uploadTrigger');
+const photoInput    = document.getElementById('photoInput');
+const previewGrid   = document.getElementById('previewGrid');
+const confirmUploadBtn = document.getElementById('confirmUploadBtn');
+const photoDescription = document.getElementById('photoDescription');
+const pendingCountEl   = document.getElementById('pendingCount');
+const uploadLoader  = document.getElementById('uploadLoader');
 
-    // Скрываем лоадер
-    const loader = document.getElementById('uploadLoader');
-    loader.style.display = 'none';
-    // Возвращаем исходный текст
-    const loaderText = loader.querySelector('.text-muted');
-    if (loaderText) loaderText.textContent = 'Загрузка фото...';
+let pendingFiles = [];
+
+if (uploadTrigger) {
+    uploadTrigger.addEventListener('click', () => photoInput.click());
+
+    photoInput.addEventListener('change', (e) => {
+        Array.from(e.target.files).forEach(addPendingFile);
+        photoInput.value = '';
+    });
+
+    ['dragover','dragenter'].forEach(ev =>
+        uploadTrigger.addEventListener(ev, e => { e.preventDefault(); uploadTrigger.classList.add('drag-over'); })
+    );
+    ['dragleave','drop'].forEach(ev =>
+        uploadTrigger.addEventListener(ev, e => { e.preventDefault(); uploadTrigger.classList.remove('drag-over'); })
+    );
+    uploadTrigger.addEventListener('drop', e => {
+        Array.from(e.dataTransfer.files)
+            .filter(f => f.type.startsWith('image/'))
+            .forEach(addPendingFile);
+    });
+
+    document.addEventListener('paste', e => {
+        const items = e.clipboardData?.items || [];
+        for (const it of items) {
+            if (it.type.startsWith('image/')) {
+                const f = it.getAsFile();
+                if (f) addPendingFile(f);
+            }
+        }
+    });
 }
 
-function showImageModal(src, description) {
-    document.getElementById('modalImage').src = src;
-    document.getElementById('modalDescription').textContent = description;
-    new bootstrap.Modal(document.getElementById('imageModal')).show();
+function addPendingFile(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+    pendingFiles.push(file);
+    renderPending();
 }
-document.addEventListener('DOMContentLoaded', function() {
-    const paymentForm = document.getElementById('paymentForm');
-    const amountInput = document.getElementById('amount');
-    const debtSpan = document.getElementById('debtAmount');
-    const paymentMethodSelect = document.getElementById('payment_method');
 
-    if (paymentForm) {
-        paymentForm.addEventListener('submit', function(e) {
-            e.preventDefault();
+function renderPending() {
+    previewGrid.innerHTML = '';
+    pendingFiles.forEach((file, idx) => {
+        const wrap = document.createElement('div');
+        wrap.className = 'preview-item';
+        const img = document.createElement('img');
+        const reader = new FileReader();
+        reader.onload = ev => img.src = ev.target.result;
+        reader.readAsDataURL(file);
+        const btn = document.createElement('button');
+        btn.className = 'remove';
+        btn.innerHTML = '<i class="fas fa-times"></i>';
+        btn.onclick = () => { pendingFiles.splice(idx, 1); renderPending(); };
+        wrap.append(img, btn);
+        previewGrid.appendChild(wrap);
+    });
+    const has = pendingFiles.length > 0;
+    confirmUploadBtn.style.display = has ? 'block' : 'none';
+    photoDescription.style.display = has ? 'block' : 'none';
+    pendingCountEl.textContent = pendingFiles.length;
+}
 
-            const amount = parseFloat(amountInput.value);
-            const debt = parseFloat(debtSpan.innerText.replace('₽', '').trim());
-            const paymentMethod = paymentMethodSelect.value;
+confirmUploadBtn?.addEventListener('click', async () => {
+    if (!pendingFiles.length) return;
+    uploadLoader.style.display = 'block';
+    confirmUploadBtn.style.display = 'none';
 
-            if (!amount || amount <= 0) {
-                alert('Введите корректную сумму');
-                return;
-            }
-
-            if (amount > debt) {
-                alert(`Сумма платежа (${amount.toFixed(2)} ₽) превышает долг (${debt.toFixed(2)} ₽)`);
-                return;
-            }
-
-            if (!paymentMethod) {
-                alert('Выберите способ оплаты');
-                return;
-            }
-
-            fetch(paymentForm.action, {
+    let ok = 0, fail = 0;
+    for (const file of pendingFiles) {
+        const fd = new FormData();
+        fd.append('image', file);
+        fd.append('description', photoDescription.value);
+        fd.append('order_id', ORDER_ID);
+        fd.append('csrfmiddlewaretoken', CSRF);
+        try {
+            const r = await fetch(UPLOAD_URL, {
                 method: 'POST',
-                headers: {
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    amount: amount,
-                    payment_method: paymentMethod,
-                    comment: document.getElementById('comment').value
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    location.reload();
-                } else {
-                    alert(data.error || 'Ошибка при добавлении платежа');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Произошла ошибка при добавлении платежа');
+                body: fd,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
             });
-        });
+            const data = await r.json();
+            if (data.success) ok++; else fail++;
+        } catch { fail++; }
     }
+
+    uploadLoader.style.display = 'none';
+    if (fail === 0) {
+        showToast(`Загружено ${ok} фото`, 'success');
+        setTimeout(() => location.reload(), 700);
+    } else {
+        showToast(`Загружено ${ok}, ошибок ${fail}`, 'warning');
+        pendingFiles = [];
+        renderPending();
+        confirmUploadBtn.style.display = 'block';
+    }
+});
+
+/* ============ Gallery ============ */
+const galleryItems = () => Array.from(document.querySelectorAll('.gallery-item'));
+let galleryIndex = 0;
+let galleryModalObj = null;
+
+function openGallery(index) {
+    if (!galleryItems().length) return;
+    galleryIndex = Math.max(0, Math.min(index, galleryItems().length - 1));
+    if (!galleryModalObj) galleryModalObj = new bootstrap.Modal(document.getElementById('galleryModal'));
+    renderGallery();
+    galleryModalObj.show();
+}
+function galleryPrev() { galleryIndex = (galleryIndex - 1 + galleryItems().length) % galleryItems().length; renderGallery(); }
+function galleryNext() { galleryIndex = (galleryIndex + 1) % galleryItems().length; renderGallery(); }
+
+function renderGallery() {
+    const list = galleryItems();
+    const el = list[galleryIndex];
+    if (!el) return;
+    document.getElementById('galleryImage').src = el.dataset.src;
+    document.getElementById('galleryTitle').textContent = 'Фото';
+    document.getElementById('galleryMeta').textContent = el.dataset.meta || '';
+    document.getElementById('galleryDescription').textContent = el.dataset.description || '';
+    document.getElementById('galleryCounter').textContent = `${galleryIndex + 1} / ${list.length}`;
+    document.getElementById('galleryDownload').href = el.dataset.src;
+}
+
+function deleteCurrentPhoto() {
+    if (!confirm('Удалить это фото?')) return;
+    showToast('Функция удаления еще находится на стадии разработки и скоро будет доступно', 'info');
+}
+
+document.addEventListener('keydown', e => {
+    const modal = document.getElementById('galleryModal');
+    if (!modal.classList.contains('show')) return;
+    if (e.key === 'ArrowLeft')  galleryPrev();
+    if (e.key === 'ArrowRight') galleryNext();
+});
+
+(function enableSwipe() {
+    const img = document.getElementById('galleryImage');
+    if (!img) return;
+    let startX = null;
+    img.addEventListener('touchstart', e => startX = e.touches[0].clientX);
+    img.addEventListener('touchend', e => {
+        if (startX == null) return;
+        const dx = e.changedTouches[0].clientX - startX;
+        if (dx > 50) galleryPrev();
+        if (dx < -50) galleryNext();
+        startX = null;
+    });
+})();
+
+/* ============ Payment (JSON) ============ */
+document.getElementById('paymentForm')?.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const amount = parseFloat(document.getElementById('amount').value);
+    const debt = parseFloat(document.getElementById('debtAmount').innerText.replace('₽','').replace(/\s/g,'').trim());
+    const method = document.getElementById('payment_method').value;
+    const comment = document.getElementById('comment').value;
+
+    if (!amount || amount <= 0) return showToast('Введите корректную сумму', 'error');
+    if (amount > debt) return showToast('Сумма превышает долг', 'error');
+    if (!method) return showToast('Выберите способ оплаты', 'error');
+
+    try {
+        const r = await fetch(PAYMENT_URL, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': CSRF,
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify({ amount, payment_method: method, comment })
+        });
+        const data = await r.json();
+        if (data.success) {
+            showToast('Платёж внесён', 'success');
+            setTimeout(() => location.reload(), 700);
+        } else {
+            showToast(data.error || 'Ошибка при добавлении', 'error');
+        }
+    } catch {
+        showToast('Ошибка сети', 'error');
+    }
+});
+
+/* ============ Notes ============ */
+async function addNote() {
+    const input = document.getElementById('newNoteInput');
+    const text = input.value.trim();
+    if (!text) return;
+    try {
+        const r = await fetch(`/order/${ORDER_ID}/notes/add/`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text })
+        });
+        const data = await r.json();
+        if (data.success) { input.value = ''; location.reload(); }
+        else showToast(data.error || 'Ошибка', 'error');
+    } catch { showToast('Ошибка сети', 'error'); }
+}
+
+
+async function changeStatus(status) {
+    try {
+        const r = await fetch("{% url 'change_order_status' order.id %}", {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': CSRF,
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify({ status })
+        });
+        const data = await r.json();
+        if (data.success) {
+            showToast(data.message || 'Статус обновлён', 'success');
+            // Обновляем бейдж в hero сразу, не дожидаясь reload
+            const badge = document.getElementById('heroStatusBadge');
+            if (badge && data.status) {
+                badge.className = 'status-badge status-' + data.status;
+                badge.innerHTML = statusIcon(data.status) + ' ' + data.status_display;
+            }
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            showToast(data.error || 'Ошибка смены статуса', 'error');
+            (data.details || []).forEach(d => showToast(d, 'warning'));
+        }
+    } catch {
+        showToast('Ошибка сети', 'error');
+    }
+}
+
+async function cancelOrder() {
+    if (!confirm('Отменить заказ? Запчасти будут возвращены на склад.')) return;
+    try {
+        const r = await fetch("{% url 'cancel_order_update' order.id %}", {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': CSRF,
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        });;
+        const data = await r.json();
+        if (data.success) {
+            showToast(data.message || 'Заказ отменён', 'success');
+            const badge = document.getElementById('heroStatusBadge');
+            if (badge && data.status) {
+                badge.className = 'status-badge status-' + data.status;
+                badge.innerHTML = statusIcon(data.status) + ' ' + data.status_display;
+            }
+            setTimeout(() => location.reload(), 1500);(data);
+        } else {
+            showToast(data.error || 'Не удалось отменить заказ', 'error');
+        }
+    } catch {
+        showToast('Ошибка сети', 'error');
+    }
+}
+
+function statusIcon(status) {
+    return {
+        accepted: '<i class="fas fa-inbox"></i>',
+        in_work: '<i class="fas fa-screwdriver-wrench"></i>',
+        waiting_spareparts: '<i class="fas fa-hourglass-half"></i>',
+        ready: '<i class="fas fa-check-circle"></i>',
+        issued: '<i class="fas fa-box"></i>',
+        cancelled: '<i class="fas fa-times-circle"></i>',
+    }[status] || '';
+}
+
+function confirmIssue() {
+    const debt = {{ order.debt|floatformat:2 }};
+    if (debt > 0) {
+        showToast(`Нельзя завершить: долг ${debt.toFixed(2)} ₽`, 'error');
+        return;
+    }
+    if (!confirm('Завершить заказ и выдать клиенту?')) return;
+    changeStatus('issued');
+}
+function doDuplicate() {
+    showToast('Дублирование еще находится на стадии разработки и скоро будет доступно', 'info');
+}
+function doNotify() {
+    const channel = document.getElementById('notifyChannel').value;
+    const text = document.getElementById('notifyText').value;
+    if (channel === 'copy') { copyText(text); return; }
+    showToast('Отправка через ' + channel + ' еще находится на стадии разработки и скоро будет доступно', 'info');
+}
+
+/* ============ Print ============ */
+function openPrintOptions() {
+    new bootstrap.Modal(document.getElementById('printModal')).show();
+}
+function doPrint() {
+    const baseUrl = document.getElementById('printDoc').value;
+    const url = new URL(baseUrl, window.location.origin);
+    url.searchParams.set('prices',     document.getElementById('optPrices').checked ? '1' : '0');
+    url.searchParams.set('signatures', document.getElementById('optSignatures').checked ? '1' : '0');
+    url.searchParams.set('bankRequisites', document.getElementById('optBankRequisites').checked ? '1' : '0');
+    url.searchParams.set('qr',         document.getElementById('optQR').checked ? '1' : '0');
+    url.searchParams.set('format',     document.getElementById('optFormat').value);
+    url.searchParams.set('copies',     document.getElementById('optCopies').value);
+    window.open(url.toString(), '_blank');
+}
+
+/* ============ Bulk select ============ */
+const itemsBody = document.getElementById('itemsBody');
+const bulkBar   = document.getElementById('bulkBar');
+const selCount  = document.getElementById('selectedCount');
+
+itemsBody?.addEventListener('change', (e) => {
+    if (!e.target.classList.contains('item-checkbox')) return;
+    const checked = itemsBody.querySelectorAll('.item-checkbox:checked').length;
+    selCount.textContent = checked;
+    bulkBar.style.setProperty('display', checked > 0 ? 'flex' : 'none', 'important');
+});
+
+function bulkDelete() {
+    const ids = Array.from(itemsBody.querySelectorAll('.item-checkbox:checked')).map(c => c.dataset.id);
+    if (!ids.length) return;
+    if (!confirm(`Удалить ${ids.length} позиций?`)) return;
+    showToast('Массовое удаление еще находится на стадии разработки и скоро будет доступно', 'info');
+}
+
+/* ============ Toasts from Django messages ============ */
+document.querySelectorAll('.messages .alert').forEach(el => {
+    const isError = el.classList.contains('alert-danger');
+    const txt = el.textContent.trim();
+    if (txt) showToast(txt, isError ? 'error' : 'success');
+    el.remove();
 });
 </script>
 {% endblock %}

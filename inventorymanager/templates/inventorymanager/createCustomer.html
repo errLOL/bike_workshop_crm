@@ -6,42 +6,358 @@
     {% if form.instance.pk %}Редактирование клиента{% else %}Добавление клиента{% endif %}
 {% endblock %}
 
+{% block extra_css %}
+<style>
+    /* ==== Фон страницы ==== */
+    .customer-page {
+        background:
+            radial-gradient(circle at 0% 0%, rgba(99, 102, 241, .08), transparent 40%),
+            radial-gradient(circle at 100% 0%, rgba(236, 72, 153, .06), transparent 40%);
+        min-height: calc(100vh - 60px);
+    }
+
+    /* ==== Карточки-секции ==== */
+    .form-card {
+        border: 1px solid rgba(0, 0, 0, .04);
+        border-radius: 18px;
+        background: #fff;
+        box-shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 8px 24px -12px rgba(16, 24, 40, .08);
+        transition: box-shadow .25s ease, transform .25s ease;
+    }
+    .form-card:hover {
+        box-shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 12px 32px -12px rgba(16, 24, 40, .12);
+    }
+
+    .section-title {
+        font-size: .72rem;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        font-weight: 700;
+        color: #6b7280;
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+    }
+    .section-title i {
+        width: 26px; height: 26px;
+        display: inline-flex; align-items: center; justify-content: center;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #eef2ff, #e0e7ff);
+        color: #4f46e5;
+        font-size: .75rem;
+    }
+
+    /* ==== Поля ввода ==== */
+    .customer-form .form-control,
+    .customer-form .form-select {
+        border-radius: 12px;
+        border: 1.5px solid #e5e7eb;
+        padding: .7rem .95rem;
+        background: #fafafa;
+        transition: all .2s ease;
+        font-size: .95rem;
+    }
+    .customer-form .form-control:hover,
+    .customer-form .form-select:hover {
+        background: #fff;
+        border-color: #d1d5db;
+    }
+    .customer-form .form-control:focus,
+    .customer-form .form-select:focus {
+        background: #fff;
+        border-color: #6366f1;
+        box-shadow: 0 0 0 4px rgba(99, 102, 241, .12);
+    }
+    .customer-form label {
+        font-weight: 600;
+        font-size: .85rem;
+        color: #374151;
+        margin-bottom: .35rem;
+    }
+    .customer-form .form-text {
+        font-size: .78rem;
+        color: #9ca3af;
+    }
+    .customer-form .asteriskField {
+        color: #ef4444;
+        margin-left: 2px;
+    }
+    .customer-form .invalid-feedback {
+        font-size: .8rem;
+    }
+
+    /* ==== Переключатель Физ/Юр ==== */
+    .type-switcher {
+        position: relative;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px;
+        padding: 4px;
+        background: #f3f4f6;
+        border-radius: 14px;
+        border: 1px solid #e5e7eb;
+    }
+    .type-switcher__thumb {
+        position: absolute;
+        top: 4px; bottom: 4px; left: 4px;
+        width: calc(50% - 4px);
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        border-radius: 11px;
+        box-shadow: 0 4px 12px -4px rgba(99, 102, 241, .6);
+        transition: transform .3s cubic-bezier(.4, 0, .2, 1);
+        pointer-events: none;
+    }
+    .type-switcher[data-mode="company"] .type-switcher__thumb {
+        transform: translateX(calc(100% + 4px));
+    }
+    .type-switcher__option {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: .5rem;
+        padding: .65rem 1rem;
+        border-radius: 11px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: .9rem;
+        color: #6b7280;
+        transition: color .2s ease;
+        user-select: none;
+        margin: 0;
+    }
+    .type-switcher__option i {
+        font-size: .9rem;
+    }
+    .type-switcher input[type="radio"] {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+    }
+    .type-switcher[data-mode="person"] .type-switcher__option[data-type="person"],
+    .type-switcher[data-mode="company"] .type-switcher__option[data-type="company"] {
+        color: #fff;
+    }
+    .type-switcher[data-mode="person"] .type-switcher__option[data-type="person"] i,
+    .type-switcher[data-mode="company"] .type-switcher__option[data-type="company"] i {
+        color: #fff;
+    }
+
+    /* ==== Анимация появления секций ==== */
+    .collapsible-section {
+        overflow: hidden;
+        transition: opacity .3s ease, transform .3s ease;
+    }
+    .collapsible-section.is-hidden {
+        display: none;
+    }
+    .collapsible-section.is-visible {
+        animation: slideDown .35s cubic-bezier(.4, 0, .2, 1);
+    }
+    @keyframes slideDown {
+        from { opacity: 0; transform: translateY(-8px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ==== Кнопки ==== */
+    .btn-gradient {
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        border: none;
+        color: #fff;
+        font-weight: 600;
+        border-radius: 12px;
+        padding: .7rem 1.6rem;
+        box-shadow: 0 4px 14px -4px rgba(99, 102, 241, .5);
+        transition: all .2s ease;
+    }
+    .btn-gradient:hover {
+        color: #fff;
+        transform: translateY(-1px);
+        box-shadow: 0 8px 20px -6px rgba(99, 102, 241, .6);
+    }
+    .btn-gradient:active {
+        transform: translateY(0);
+    }
+    .btn-soft {
+        background: #f3f4f6;
+        border: none;
+        color: #4b5563;
+        font-weight: 600;
+        border-radius: 12px;
+        padding: .7rem 1.4rem;
+        transition: background .2s ease;
+    }
+    .btn-soft:hover {
+        background: #e5e7eb;
+        color: #111827;
+    }
+</style>
+{% endblock %}
+
 {% block body %}
-<div class="container py-4">
+<div class="customer-page">
+<div class="container py-4 py-lg-5">
     <div class="row justify-content-center">
-        <div class="col-md-6">
-            <div class="card shadow-sm">
-                <div class="card-header bg-white py-3">
-                    <h5 class="mb-0">
-                        <i class="fas {% if form.instance.pk %}fa-edit{% else %}fa-user-plus{% endif %} me-2 text-primary"></i>
+        <div class="col-lg-8 col-xl-7">
+
+            {# Заголовок #}
+            <div class="d-flex align-items-start justify-content-between mb-4">
+                <div>
+                    <h1 class="h3 fw-bold mb-1">
                         {% if form.instance.pk %}
-                            Редактирование клиента: {{ form.instance.name }}
+                            <i class="fas fa-user-edit text-primary me-2"></i>Редактирование клиента
                         {% else %}
-                            Добавление клиента
+                            <i class="fas fa-user-plus text-primary me-2"></i>Новый клиент
                         {% endif %}
-                    </h5>
+                    </h1>
+                    <p class="text-muted mb-0 small">
+                        {% if form.instance.pk %}
+                            Обновите данные клиента «{{ form.instance.name }}»
+                        {% else %}
+                            Заполните карточку нового клиента
+                        {% endif %}
+                    </p>
                 </div>
-                <div class="card-body">
-                    <form method="post">
-                        {% csrf_token %}
-                        {{ form|crispy }}
-                        <div class="d-flex justify-content-end gap-2 mt-4">
-                            <a href="{% url 'customers' %}" class="btn btn-secondary">
-                                <i class="fas fa-times me-1"></i>Отмена
-                            </a>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save me-1"></i>
-                                {% if form.instance.pk %}Сохранить{% else %}Добавить{% endif %}
-                            </button>
-                        </div>
-                    </form>
-                </div>
+                <a href="{% url 'customers' %}" class="btn btn-soft btn-sm">
+                    <i class="fas fa-arrow-left me-1"></i>Назад
+                </a>
             </div>
+
+            <form method="post" class="customer-form" novalidate id="customerForm">
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger rounded-3">{{ form.non_field_errors }}</div>
+                {% endif %}
+
+                {# ==== Переключатель типа клиента ==== #}
+                <div class="form-card p-3 p-md-4 mb-3">
+                    <div class="type-switcher" id="typeSwitcher" data-mode="person">
+                        <div class="type-switcher__thumb"></div>
+
+                        <label class="type-switcher__option" data-type="person">
+                            <input type="radio" name="{{ form.is_company.html_name }}" value="False"
+                                   {% if not form.is_company.value %}checked{% endif %}>
+                            <i class="fas fa-user"></i>Физ. лицо
+                        </label>
+
+                        <label class="type-switcher__option" data-type="company">
+                            <input type="radio" name="{{ form.is_company.html_name }}" value="True"
+                                   {% if form.is_company.value %}checked{% endif %}>
+                            <i class="fas fa-building"></i>Юр. лицо
+                        </label>
+                    </div>
+                </div>
+
+                {# ==== Основная информация ==== #}
+                <div class="form-card p-3 p-md-4 mb-3">
+                    <div class="section-title mb-3">
+                        <i class="fas fa-id-card"></i>Основная информация
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            {{ form.name|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.phone|as_crispy_field }}
+                        </div>
+                        <div class="col-12">
+                            {{ form.telegram|as_crispy_field }}
+                        </div>
+                    </div>
+                </div>
+
+                {# ==== Данные компании (скрыто по умолчанию) ==== #}
+                <div class="form-card p-3 p-md-4 mb-3 collapsible-section is-hidden" id="companySection">
+                    <div class="section-title mb-3">
+                        <i class="fas fa-building"></i>Данные компании
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-12">
+                            {{ form.company_name|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.inn|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.kpp|as_crispy_field }}
+                        </div>
+                        <div class="col-12">
+                            {{ form.legal_address|as_crispy_field }}
+                        </div>
+                    </div>
+                </div>
+
+                {# ==== Представитель (скрыто по умолчанию) ==== #}
+                <div class="form-card p-3 p-md-4 mb-3 collapsible-section is-hidden" id="representativeSection">
+                    <div class="section-title mb-3">
+                        <i class="fas fa-user-tie"></i>Представитель
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            {{ form.representative_name|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.representative_position|as_crispy_field }}
+                        </div>
+                        <div class="col-12">
+                            {{ form.representative_basis|as_crispy_field }}
+                        </div>
+                    </div>
+                </div>
+
+                {# ==== Кнопки ==== #}
+                <div class="d-flex justify-content-between align-items-center mt-4">
+                    <a href="{% url 'customers' %}" class="btn btn-soft">
+                        <i class="fas fa-times me-1"></i>Отмена
+                    </a>
+                    <button type="submit" class="btn btn-gradient">
+                        <i class="fas fa-check me-1"></i>
+                        {% if form.instance.pk %}Сохранить{% else %}Добавить клиента{% endif %}
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
+</div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script src="{% static 'inventorymanager/js/phone_mask.js' %}"></script>
+<script>
+(function () {
+    const switcher = document.getElementById('typeSwitcher');
+    const companySection = document.getElementById('companySection');
+    const representativeSection = document.getElementById('representativeSection');
+    if (!switcher) return;
+
+    const radios = switcher.querySelectorAll('input[type="radio"]');
+
+    function applyMode(isCompany) {
+        switcher.dataset.mode = isCompany ? 'company' : 'person';
+        [companySection, representativeSection].forEach(el => {
+            if (!el) return;
+            if (isCompany) {
+                el.classList.remove('is-hidden');
+                el.classList.add('is-visible');
+            } else {
+                el.classList.add('is-hidden');
+                el.classList.remove('is-visible');
+            }
+        });
+    }
+
+    // Инициализация по текущему состоянию radio
+    function currentMode() {
+        const checked = switcher.querySelector('input[type="radio"]:checked');
+        return checked && checked.value === 'True';
+    }
+    applyMode(currentMode());
+
+    // Клик по опциям
+    radios.forEach(r => r.addEventListener('change', () => applyMode(currentMode())));
+})();
+</script>
 {% endblock %}

@@ -27,6 +27,14 @@ DEBUG = True
 
 ALLOWED_HOSTS = ["*"]
 DOMAIN = "http://127.0.0.1"
+COMPANY_FULLNAME = "Индивидуальный предприниматель Фамилия Имя Отчество"
+COMPANY_NAME = "ИП Фамилия Имя Отчество"
+COMPANY_INN = "000000000000"
+COMPANY_OGRNIP = "000000000000000"
+COMPANY_ADDRESS = "000000, г. Город, ул. Улица, д. 0, кв. 0"
+COMPANY_PHONE = "+7 (000) 000-00-00"
+COMPANY_EMAIL = " info@example.ru"
+COMPANY_SITE = ""
 
 
 # Application definition
@@ -119,12 +127,12 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/
 
-LANGUAGE_CODE = "en-us"
+LANGUAGE_CODE = "ru-RU"
 
 TIME_ZONE = "Europe/Moscow"
 
 USE_I18N = True
-
+USE_L10N = True
 USE_TZ = True
 
 

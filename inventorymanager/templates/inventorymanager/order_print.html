@@ -144,25 +144,38 @@ table {
 }
 
 .signatures {
-    margin-top: 25px;
-}
-
-.signature-row {
+    margin-top: 14px;
     display: flex;
-    justify-content: space-between;
     gap: 20px;
 }
 
-.signature-box {
-    width: 48%;
-    font-size: 12px;
+.sign-box {
+    flex: 1 1 50%;
+    font-size: 11px;
 }
 
-.signature-line {
-    margin-top: 25px;
+.signature-wrap {
+    height: 60px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-start;
+    margin-top: 6px;
+}
+
+.signature-img {
+    max-height: 55px;
+    max-width: 180px;
+    object-fit: contain;
+}
+
+
+.sign-line {
+    margin-top: 4px;
     border-top: 1px solid #000;
     text-align: center;
     padding-top: 2px;
+    font-size: 9px;
+    color: #333;
 }
 
 .footer {
@@ -207,7 +220,7 @@ table {
     </div>
 
     <div class="document-number">
-        от {{ order.created_at|date:"d.m.Y" }}
+        от {{ current_date|date:"d.m.Y" }}
     </div>
 
 </div>
@@ -389,45 +402,37 @@ table {
 <div class="conditions">
     <strong>Условия:</strong>
     Гарантия на выполненные работы составляет 30 дней.
-    Получатель проверил комплектность техники и не имеет претензий к качеству выполненных работ.
+    Гарантия действует на выполненные работы и установленные запчасти при соблюдении правил эксплуатации.
 </div>
-
-<div class="order-info">
-
-    Дата выдачи:
-    <strong>{{ order.completed_at|date:"d.m.Y H:i" }}</strong>
-
-</div>
-
 
 <div class="signatures">
-
-    <div class="signature-row">
-
-        <div class="signature-box">
-
-            Технику получил,
-            претензий не имею.
-
-            <div class="signature-line">
-                Подпись клиента
-            </div>
-
+    <div class="sign-box">
+        <b>Принял в работу:</b><br>
+        {{ company_name }}
+        <div class="signature-wrap">
+        {% if show_signatures %}
+            <img src="{% static 'inventorymanager/img/sign.jpeg' %}"
+                 alt="Подпись исполнителя"
+                 class="signature-img">
+        {% endif %}
         </div>
-
-        <div class="signature-box">
-
-            Работы выполнены
-            в полном объёме.
-
-            <div class="signature-line">
-                Подпись мастера
-            </div>
-
-        </div>
-
+        <div class="sign-line">подпись</div>
+        {{ current_date| date:'"j" F Y' }}
     </div>
-
+    <div class="sign-box">
+        <b>С условиями согласен:</b><br>
+        {% if order.customer.is_company %}
+            {{ order.customer.representative_name|default:"____________________" }}
+            {% if order.customer.representative_position %}
+                , {{ order.customer.representative_position }}
+            {% endif %}
+        {% else %}
+            {{ order.customer.name|default:"____________________" }}
+        {% endif %}
+        <div class="signature-wrap"></div>
+        <div class="sign-line">подпись</div>
+        {{ current_date| date:'"j" F Y' }}
+    </div>
 </div>
 
 <div class="footer">

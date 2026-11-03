@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Акт выполненных работ № АВР-{{ order.id }}</title>
+{% load static custom_filters %}
+<style>
+
+@page {
+    size: A4;
+    margin: 8mm;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.25;
+    color: #000;
+    margin: 0;
+}
+
+* { box-sizing: border-box; }
+
+table { width: 100%; border-collapse: collapse; }
+
+/* ---------- Шапка ---------- */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+    border-bottom: 1px solid #000;
+    padding-bottom: 6px;
+}
+
+.header-left { flex: 0 0 auto; }
+.header-left img { width: 240px; }
+
+.header-right {
+    flex: 1 1 auto;
+    text-align: right;
+    font-size: 10px;
+    line-height: 1.35;
+}
+
+.header-right .ip-name {
+    font-size: 12px;
+    font-weight: bold;
+    margin-bottom: 2px;
+}
+
+/* ---------- Заголовок документа ---------- */
+.doc-title {
+    text-align: center;
+    margin: 14px 0 4px 0;
+    font-size: 20px;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+}
+
+.doc-subtitle {
+    text-align: center;
+    font-size: 11px;
+    margin-bottom: 2px;
+}
+
+.doc-ref {
+    text-align: center;
+    font-size: 10px;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+/* ---------- Секции ---------- */
+.section { margin-top: 10px; }
+
+.section-title {
+    font-size: 11px;
+    font-weight: bold;
+    border-bottom: 1px solid #000;
+    padding-bottom: 2px;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.info-table td {
+    padding: 2px 4px;
+    vertical-align: top;
+    font-size: 11px;
+}
+
+.info-table .label {
+    width: 130px;
+    font-weight: bold;
+    color: #222;
+}
+
+/* ---------- Стороны ---------- */
+.parties {
+    display: flex;
+    gap: 16px;
+    margin-top: 6px;
+}
+
+.party {
+    flex: 1 1 50%;
+    border: 1px solid #000;
+    padding: 6px 8px;
+    font-size: 11px;
+}
+
+.party h4 {
+    margin: 0 0 4px 0;
+    font-size: 11px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.party p { margin: 2px 0; }
+
+/* ---------- Таблица позиций ---------- */
+.items-table {
+    margin-top: 4px;
+}
+
+.items-table th,
+.items-table td {
+    border: 1px solid #000;
+    padding: 3px 4px;
+    font-size: 10px;
+}
+
+.items-table th {
+    text-align: center;
+    font-weight: bold;
+    background: #f0f0f0;
+}
+
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+
+/* ---------- Итоги ---------- */
+.total-block {
+    width: 320px;
+    margin-left: auto;
+    margin-top: 8px;
+}
+
+.total-block td {
+    border: 1px solid #000;
+    padding: 4px 6px;
+    font-size: 11px;
+}
+
+.total-block .grand {
+    font-weight: bold;
+    background: #f0f0f0;
+}
+
+.amount-words {
+    margin-top: 6px;
+    font-size: 10px;
+    text-align: right;
+    font-style: italic;
+}
+
+/* ---------- Гарантия ---------- */
+.warranty {
+    margin-top: 10px;
+    border: 1px solid #000;
+    padding: 6px 8px;
+    font-size: 10px;
+}
+
+.warranty ol {
+    margin: 4px 0 0 16px;
+    padding: 0;
+}
+
+.warranty li { margin-bottom: 2px; }
+
+/* ---------- Приёмка ---------- */
+.acceptance {
+    margin-top: 10px;
+    border: 1px solid #000;
+    padding: 6px 8px;
+    font-size: 11px;
+}
+
+.remarks-box {
+    margin-top: 4px;
+    border: 1px dashed #666;
+    min-height: 60px;
+    padding: 4px;
+    font-size: 10px;
+    color: #555;
+}
+
+.small-note {
+    margin-top: 4px;
+    font-size: 9px;
+    color: #555;
+}
+
+/* ---------- Подписи ---------- */
+.signatures {
+    margin-top: 14px;
+    display: flex;
+    gap: 20px;
+}
+
+.sign-box {
+    flex: 1 1 50%;
+    font-size: 11px;
+}
+/* ---------- Подпись исполнителя ---------- */
+.signature-wrap {
+    height: 60px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-start;
+    margin-top: 6px;
+}
+
+.signature-img {
+    max-height: 55px;
+    max-width: 180px;
+    object-fit: contain;
+}
+
+/* линия для подписи */
+.sign-line {
+    margin-top: 4px;
+    border-top: 1px solid #000;
+    text-align: center;
+    padding-top: 2px;
+    font-size: 9px;
+    color: #333;
+}
+
+.footer {
+    margin-top: 18px;
+    text-align: center;
+    font-size: 8px;
+    color: #555;
+}
+
+@media print {
+    body { margin: 0; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .no-print { display: none !important; }
+}
+
+</style>
+</head>
+
+<body>
+
+<!-- ===================== ШАПКА ===================== -->
+<div class="header">
+    <div class="header-left">
+        <img src="{% static 'inventorymanager/img/1.svg' %}" alt="">
+    </div>
+    <div class="header-right">
+        <div class="ip-name">{{ company_fullname }}</div>
+        {% if company_inn %}ИНН {{ company_inn }}{% endif %}
+        {% if company_ogrnip %}&nbsp;|&nbsp; ОГРНИП {{ company_ogrnip }}{% endif %}<br>
+        {% if company_address %}Адрес: {{ company_address }}<br>{% endif %}
+        {% if company_phone %}Тел.: {{ company_phone }}{% endif %}
+        {% if company_email %}&nbsp;|&nbsp; Email: {{ company_email }}{% endif %}
+        {% if company_site %}&nbsp;|&nbsp; Сайт: {{ company_site }}{% endif %}
+        {% if show_bank_requisites %}
+        <br>Р/с {{ company_bank_account }} в {{ company_bank_name }}, БИК {{ company_bank_bik }}, к/с {{ company_bank_corr_account }}
+        {% endif %}
+    </div>
+</div>
+
+<!-- ===================== ЗАГОЛОВОК ===================== -->
+<div class="doc-title">АКТ ВЫПОЛНЕННЫХ РАБОТ № АВР-{{ order.id }}</div>
+{% if order.completed_at %}
+<div class="doc-subtitle">от {{ order.completed_at|date:"d.m.Y" }}</div>
+{% else %}
+<div class="doc-subtitle">от {{ current_date|date:"d.m.Y" }}</div>
+{% endif %}
+<!-- ===================== СТОРОНЫ ===================== -->
+<div class="section">
+    <div class="section-title">Стороны</div>
+    <div class="parties">
+
+        <div class="party">
+            <h4>Исполнитель</h4>
+            <p><b>{{ company_name }}</b></p>
+            {% if company_inn %}<p>ИНН {{ company_inn }}</p>{% endif %}
+            {% if company_ogrnip %}<p>ОГРНИП {{ company_ogrnip }}</p>{% endif %}
+        </div>
+
+        <div class="party">
+            <h4>Заказчик</h4>
+            {% if order.customer.is_company %}
+                <p><b>{{ order.customer.company_name }}</b></p>
+                <p>ИНН {{ order.customer.inn|default:"—" }}{% if order.customer.kpp %} / КПП {{ order.customer.kpp }}{% endif %}</p>
+                <p>Адрес: {{ order.customer.legal_address|default:"—" }}</p>
+                <p>Представитель: {{ order.customer.representative_name|default:"—" }}
+                    {% if order.customer.representative_position %}
+                        , {{ order.customer.representative_position }}
+                    {% endif %}
+                </p>
+                {% if order.customer.representative_basis %}
+                <p>Основание: {{ order.customer.representative_basis }}</p>
+                {% endif %}
+            {% else %}
+                <p><b>{{ order.customer.name|default:"—" }}</b></p>
+                <p>Телефон: {{ order.customer.phone|default:"—" }}</p>
+                {% if order.customer.telegram %}
+                <p>Telegram: @{{ order.customer.telegram }}</p>
+                {% endif %}
+            {% endif %}
+        </div>
+
+    </div>
+</div>
+
+<!-- ===================== ОБЪЕКТ РАБОТ ===================== -->
+<div class="section">
+    <div class="section-title">Транспорт</div>
+    <table class="info-table">
+        <tr>
+            <td class="label">Наименование</td>
+            <td>{{ order.transport.name|default:"—" }}</td>
+        </tr>
+        {% if order.transport.serial_number %}
+        <tr>
+            <td class="label">Серийный номер</td>
+            <td>{{ order.transport.serial_number }}</td>
+        </tr>
+        {% endif %}
+        {% if order.transport.color %}
+        <tr>
+            <td class="label">Цвет</td>
+            <td>{{ order.transport.color }}</td>
+        </tr>
+        {% endif %}
+    </table>
+</div>
+
+<!-- ===================== ПОЗИЦИИ ===================== -->
+<div class="section">
+    <div class="section-title">Перечень выполненных работ и использованных запчастей</div>
+
+    <table class="items-table">
+        <thead>
+            <tr>
+                <th width="28">№</th>
+                <th>Наименование</th>
+                <th width="70">Тип</th>
+                <th width="50">Кол.</th>
+                <th width="80">Цена, ₽</th>
+                <th width="90">Сумма, ₽</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in order.order_items.all %}
+            <tr>
+                <td class="text-center">{{ forloop.counter }}</td>
+                <td>{{ item.product.name }}</td>
+                <td class="text-center">
+                    {% if item.product.product_type == 'service' %}Услуга{% else %}Запчасть{% endif %}
+                </td>
+                <td class="text-center">{{ item.quantity }}</td>
+                <td class="text-right">{{ item.unit_price|floatformat:2 }}</td>
+                <td class="text-right">{{ item.subtotal|floatformat:2 }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- ===================== ИТОГИ ===================== -->
+<div class="total-block">
+    <table>
+        <tr>
+            <td>Итого по акту</td>
+            <td class="text-right">{{ order.total|floatformat:2 }} ₽</td>
+        </tr>
+        <tr>
+            <td>Скидка</td>
+            <td class="text-right">{{ order.total_discount|floatformat:2|default:"0.00" }} ₽</td>
+        </tr>
+        <tr>
+            <td>Оплачено</td>
+            <td class="text-right">{{ order.total_paid|floatformat:2 }} ₽</td>
+        </tr>
+        <tr class="grand">
+            <td>К оплате</td>
+            <td class="text-right">{{ order.debt|floatformat:2 }} ₽</td>
+        </tr>
+    </table>
+    <div class="amount-words">
+        Сумма прописью: {{ order.debt|amount_in_words }}
+    </div>
+</div>
+
+<!-- ===================== ГАРАНТИЯ ===================== -->
+<div class="warranty">
+    <b>Гарантия.</b> Срок гарантии на выполненные работы — <b>{{ warranty_days|default:30 }} дней</b> с даты подписания настоящего акта.
+    <ol>
+        <li>Гарантия распространяется на дефекты, связанные с выполненными работами и установленными запчастями.</li>
+        <li>Гарантия не действует при вскрытии устройства третьими лицами, механических повреждениях, попадании жидкости и нарушении условий эксплуатации.</li>
+        <li>Гарантийные работы выполняются бесплатно при обращении в течение указанного срока.</li>
+    </ol>
+</div>
+
+<!-- ===================== ПРИЁМКА ===================== -->
+<div class="acceptance">
+    <b>Приёмка работ.</b>
+    Работоспособность проверена и продемонстрирована в присутствии заказчика.
+    Работы выполнены в полном объёме. Заказчик претензий по объёму, качеству выполненных работ и внешнему виду не имеет.
+
+    <div class="remarks-box">Замечания при приёмке (при наличии):</div>
+
+    <div class="small-note">
+        Подписание акта не лишает заказчика прав по гарантии и в отношении недостатков, которые не могли быть обнаружены при обычной приёмке.
+    </div>
+</div>
+
+<!-- ===================== ПОДПИСИ ===================== -->
+<div class="signatures">
+    <div class="sign-box">
+        <b>Исполнитель сдал:</b><br>
+        {{ company_name }}
+        <div class="signature-wrap">
+        {% if show_signatures %}
+            <img src="{% static 'inventorymanager/img/sign.jpeg' %}"
+                 alt="Подпись исполнителя"
+                 class="signature-img">
+        {% endif %}
+        </div>
+        <div class="sign-line">подпись</div>
+        {{ current_date| date:'"j" F Y' }}
+    </div>
+    <div class="sign-box">
+        <b>Заказчик принял:</b><br>
+        {% if order.customer.is_company %}
+            {{ order.customer.representative_name|default:"____________________" }}
+            {% if order.customer.representative_position %}
+                , {{ order.customer.representative_position }}
+            {% endif %}
+        {% else %}
+            {{ order.customer.name|default:"____________________" }}
+        {% endif %}
+        <div class="signature-wrap"></div>
+        <div class="sign-line">подпись</div>
+        {{ current_date| date:'"j" F Y' }}
+    </div>
+</div>
+
+<div class="footer">
+    Документ сформирован автоматически {{ current_date|date:"d.m.Y H:i" }}
+</div>
+
+</body>
+</html>
