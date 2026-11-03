@@ -238,6 +238,7 @@
         </td>
     </tr>
 </template>
+{{ products_json|json_script:"products-data" }}
 {% endblock %}
 
 {% block extra_css %}
@@ -296,21 +297,8 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM загружен, инициализация...');
-
-    // ========================
-    // 1. Данные о продуктах
-    // ========================
-    const productsData = {
-        {% for product in products %}
-        {{ product.id }}: {
-            id: {{ product.id }},
-            name: "{{ product.name|escapejs }}",
-            price: {{ product.unit_cost }},
-            type: "{{ product.product_type }}",
-            image: "{% if product.image %}{{ product.image.url }}{% endif %}"
-        },
-        {% endfor %}
-    };
+    const productsList = JSON.parse(document.getElementById('products-data').textContent);
+    const productsData = Object.fromEntries(productsList.map(p => [p.id, p]));
 
     // ========================
     // 2. Данные о клиентах (Customer)

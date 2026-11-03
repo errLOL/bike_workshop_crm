@@ -870,7 +870,7 @@
                 </div>
             </div>
             <!-- Notes (details) -->
-            <details class="detail-card" data-persist="notes">
+            <details class="detail-card" data-persist="notes" open>
                 <summary>
                     <span class="icon-wrap orange"><i class="fas fa-sticky-note"></i></span>
                     Внутренние заметки
@@ -905,8 +905,7 @@
                     </div>
                 </div>
             </details>
-            <!-- Client (details, открыт по умолчанию) -->
-            <details class="detail-card" data-persist="client" open>
+            <details class="detail-card" data-persist="client">
                 <summary>
                     <span class="icon-wrap"><i class="fas fa-user"></i></span>
                     Клиент
@@ -923,7 +922,7 @@
                     <div class="info-row">
                         <div class="info-label">Телефон</div>
                         <div class="info-value d-flex align-items-center gap-2 flex-wrap">
-                            <a href="tel:+{{ order.customer.phone }}">+{{ order.customer.formatted_phone }}</a>
+                            <a href="tel:+{{ order.customer.phone }}">{{ order.customer.formatted_phone }}</a>
                             <button class="btn btn-sm btn-link p-0" onclick="copyText('+{{ order.customer.phone }}')" title="Скопировать">
                                 <i class="fas fa-copy text-muted"></i>
                             </button>
@@ -948,8 +947,7 @@
                 </div>
             </details>
 
-            <!-- Transport (details) -->
-            <details class="detail-card" data-persist="transport" open>
+            <details class="detail-card" data-persist="transport">
                 <summary>
                     <span class="icon-wrap"><i class="fas fa-bicycle"></i></span>
                     Техника
@@ -994,8 +992,7 @@
                 </div>
             </details>
 
-            <!-- Photos (details) -->
-            <details class="detail-card" data-persist="photos" open>
+            <details class="detail-card" data-persist="photos">
                 <summary>
                     <span class="icon-wrap"><i class="fas fa-camera"></i></span>
                     Фото транспорта
@@ -1051,7 +1048,6 @@
                 </div>
             </details>
 
-            <!-- Payment (всегда открыт) -->
             <div class="detail-card payment-card">
                 <div class="card-header">
                     <span class="icon-wrap green"><i class="fas fa-credit-card"></i></span>
@@ -1319,6 +1315,7 @@
             </div>
         </div>
     </div>
+    {{ order.debt|default:0|json_script:"debt-value" }}
 </div>
 {% endblock %}
 {% block extra_js %}
@@ -1652,7 +1649,7 @@ function statusIcon(status) {
 }
 
 function confirmIssue() {
-    const debt = {{ order.debt|floatformat:2 }};
+    const debt = JSON.parse(document.getElementById('debt-value').textContent);
     if (debt > 0) {
         showToast(`Нельзя завершить: долг ${debt.toFixed(2)} ₽`, 'error');
         return;

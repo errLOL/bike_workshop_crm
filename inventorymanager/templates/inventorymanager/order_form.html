@@ -324,7 +324,7 @@
         </div>
     </div>
 </div>
-
+{{ products_json|json_script:"products-data" }}
 {% endblock %}
 
 {% block extra_css %}
@@ -622,18 +622,8 @@ document.addEventListener('DOMContentLoaded', function() {
         );
 
 
-    const productsData = {
-        {% for product in products %}
-        {{ product.id }}: {
-            id: {{ product.id }},
-            name: "{{ product.name|escapejs }}",
-            price: {{ product.unit_cost }},
-            type: "{{ product.product_type }}",
-            stock: {{ product.quantity_in_stock|default:0 }},
-            image: "{% if product.image %}{{ product.image.url }}{% endif %}"
-        },
-        {% endfor %}
-    };
+    const productsList = JSON.parse(document.getElementById('products-data').textContent);
+    const productsData = Object.fromEntries(productsList.map(p => [p.id, p]));
 
     const customersData = [
         {% for customer in customers %}

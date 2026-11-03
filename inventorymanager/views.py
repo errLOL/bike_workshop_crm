@@ -1151,7 +1151,17 @@ def create_order(request):
     technicians = User.objects.filter(
         Q(is_superuser=True) | Q(groups__name='Technician') & Q(is_active=True)
     ).distinct().order_by('first_name', 'username')
-
+    products_payload = [
+        {
+            "id": p.id,
+            "name": p.name,
+            "price": float(p.unit_cost),
+            "type": p.product_type or "",
+            "stock": p.quantity_in_stock or 0,
+            "image": p.image.url if p.image else "",
+        }
+        for p in products
+    ]
     if request.method == 'POST':
         form = OrderForm(request.POST)
         formset = OrderItemFormSet(request.POST)
@@ -1165,6 +1175,7 @@ def create_order(request):
                 context = {'form': form,
                             'formset': formset,
                             'products': products,
+                            'products_json': products_payload,
                             'customers': customers,
                             'transports': transports,
                             'initial_customer': initial_customer or '',
@@ -1249,6 +1260,7 @@ def create_order(request):
         'form': form,
         'formset': formset,
         'products': products,
+        'products_json': products_payload,
         'customers': customers,
         'transports': transports,
         'technicians': technicians,
@@ -1479,6 +1491,17 @@ def edit_order(request, order_id):
     technicians = User.objects.filter(
         Q(is_superuser=True) | Q(groups__name='Technician') & Q(is_active = True)
     ).distinct().order_by('first_name', 'username')
+    products_payload = [
+        {
+            "id": p.id,
+            "name": p.name,
+            "price": float(p.unit_cost),
+            "type": p.product_type or "",
+            "stock": p.quantity_in_stock or 0,
+            "image": p.image.url if p.image else "",
+        }
+        for p in products
+    ]
     if request.method == 'POST':
         if order.status == 'issued' and not is_admin(request.user):
             messages.error(request,f'Ошибка доступа')
@@ -1658,6 +1681,7 @@ def edit_order(request, order_id):
         'initial_customer': order.customer.id or '',
         'initial_transport': order.transport.id or '',
         'products': products,
+        'products_json': products_payload,
     })
 
 
